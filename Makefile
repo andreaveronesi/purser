@@ -32,7 +32,7 @@ NFPM  := $(GOBIN)/nfpm
 RUST_MANIFEST := rust/Cargo.toml
 GO_MODULES    := gen planner controlplane
 
-.PHONY: all help setup gen build test lint fmt clean release package-agent demo demo-stop demo-seed demo-agent dev-agent dev status contract e2e verify install-hooks
+.PHONY: all help setup gen build test lint fmt clean release package-agent demo demo-stop demo-seed demo-agent dev-agent dev status contract e2e verify install-hooks ui-coverage ui-mutation
 
 all: gen build
 
@@ -55,6 +55,8 @@ help:
 	@echo "  make release Build stripped release binaries + stage dist/ (scripts/build-release.sh)"
 	@echo "  make status  Show stack health (CP, fleet, catalog, deployments)"
 	@echo "  make package-agent  Build the agent .deb + .rpm into dist/ (nfpm)"
+	@echo "  make ui-coverage  Run UI tests with v8 line+branch coverage (ui/coverage/)"
+	@echo "  make ui-mutation  Run Stryker mutation testing for the UI (ui/reports/mutation/)"
 
 setup:
 	./tools/setup-toolchain.sh
@@ -200,6 +202,14 @@ verify: contract
 ## install-hooks: Activate the local pre-push gate (opt-in, run once)
 install-hooks:
 	bash tools/hooks/install.sh
+
+## ui-coverage: Run UI tests with v8 line+branch coverage (output: ui/coverage/)
+ui-coverage:
+	npm --prefix ui run test:coverage
+
+## ui-mutation: Run Stryker mutation testing for the UI (output: ui/reports/mutation/)
+ui-mutation:
+	npm --prefix ui run test:mutation
 
 ## status: Show stack health (CP, fleet, catalog, deployments)
 status:

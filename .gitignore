@@ -18,6 +18,12 @@ target/
 node_modules/
 ui/dist/
 ui/build/
+# v8 coverage reports (vitest --coverage)
+ui/coverage/
+# Stryker mutation testing artefacts
+ui/.stryker-tmp/
+.stryker-tmp/
+ui/reports/
 
 # --- Built binaries ---
 /bin/
