@@ -40,7 +40,6 @@ export const qk = {
   apiKeys: ['apiKeys'] as const,
   gatewayModels: (baseUrl: string) => ['gatewayModels', baseUrl] as const,
   reconcilerStatus: ['reconcilerStatus'] as const,
-  sloCompliance: (windowHours: number) => ['sloCompliance', windowHours] as const,
 
   dataPlanes: ['dataPlanes'] as const,
   serviceAccounts: ['serviceAccounts'] as const,
@@ -915,21 +914,6 @@ export function useApiKeyTeamSlugs(): string[] {
 export function useWhatIfPlan() {
   return useMutation({
     mutationFn: (request: WhatIfRequest) => api.whatIfPlan(request),
-  });
-}
-
-// --- SLO compliance ---------------------------------------------------------
-
-export function useSloCompliance(windowHours = 24) {
-  return useQuery({
-    queryKey: qk.sloCompliance(windowHours),
-    queryFn: () =>
-      api.getSloCompliance(windowHours).catch((e: unknown) => {
-        // 404 = endpoint not available in this CP version (pre-v0.6); hide silently.
-        if (e instanceof Error && e.message.includes('404')) return null;
-        throw e;
-      }),
-    refetchInterval: 60_000,
   });
 }
 

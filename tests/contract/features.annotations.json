@@ -390,7 +390,6 @@
       "GET /api/v1/slo/compliance"
     ],
     "client": [
-      "getSloCompliance",
       "getSloComplianceFull"
     ],
     "page": "/slo",

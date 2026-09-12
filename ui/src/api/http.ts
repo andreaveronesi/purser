@@ -81,7 +81,6 @@ import type {
   ServiceAccount,
   ServiceAccountWithSecret,
   SloApiResponse,
-  SloComplianceResponse,
   Team,
   TeamBillingReport,
   TeamMember,
@@ -1177,16 +1176,6 @@ export function createHttpApi(baseUrl: string): PurserApi {
     // --- what-if planner ---
     whatIfPlan: (body: WhatIfRequest): Promise<WhatIfResult> =>
       request<WhatIfResult>('/planner/what-if', { method: 'POST', body }),
-
-    // --- SLO compliance ---
-    getSloCompliance: (windowHours = 24): Promise<SloComplianceResponse> =>
-      request<unknown>(`/slo/compliance?window_hours=${windowHours}`).then((raw) => {
-        const r = (raw ?? {}) as Record<string, unknown>;
-        return {
-          models: Array.isArray(r.models) ? r.models as SloComplianceResponse['models'] : [],
-          window_hours: typeof r.windowHours === 'number' ? r.windowHours : windowHours,
-        };
-      }),
 
     // --- SLO compliance (full nested shape, v0.6) ---
     getSloComplianceFull: (windowHours = 24): Promise<SloApiResponse> =>

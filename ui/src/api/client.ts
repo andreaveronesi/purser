@@ -68,7 +68,6 @@ import type {
   PoolTeamQuota,
   RolesResponse,
   ReconcilerStatus,
-  SloComplianceResponse,
 
   ServiceAccount,
   ServiceAccountWithSecret,
@@ -289,9 +288,6 @@ export interface PurserApi {
   whatIfPlan(request: WhatIfRequest): Promise<WhatIfResult>;
 
   // --- SLO compliance ---
-  /** GET /api/v1/slo/compliance — per-model TTFT SLO compliance for a rolling window. */
-  getSloCompliance(windowHours?: number): Promise<SloComplianceResponse>;
-
   /** GET /api/v1/slo/compliance — full nested compliance response (v0.6). */
   getSloComplianceFull(windowHours?: number): Promise<SloApiResponse>;
 

@@ -1003,7 +1003,6 @@ export const mockBackend: PurserApi = {
   },
 
   // --- data planes ---
-  getSloCompliance(_windowHours = 24) { return delay({ models: [], window_hours: 24 }); },
   listDataPlanes() { return delay([]); },
   createDataPlane(_input: CreateDataPlaneInput): Promise<DataPlaneWithToken> {
     const dp = { id: 'dp-1', name: 'demo', tier: 'development', gatewayUrl: '', status: 'registering', lastHeartbeat: null, nodeCount: 0, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() } as import('../api/types').DataPlane;

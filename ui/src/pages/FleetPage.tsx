@@ -21,13 +21,13 @@ import {
   useNodes,
   useNodeAction,
   useReconcilerStatus,
-  useSloCompliance,
+  useSloComplianceFull,
   type ReconcilerStatus,
 } from '../hooks/queries';
 import { useT, type TFunc } from '../i18n';
 import { gb, tokS } from '../lib/format';
 import { errorMessage } from '../lib/errors';
-import type { ClusterCapacity, ClusterStatus, EngineMetrics, LinkQuality, NodeView, SloModelCompliance } from '../api/types';
+import type { ClusterCapacity, ClusterStatus, EngineMetrics, LinkQuality, NodeView, SloModelEntry } from '../api/types';
 
 const LINK_TONE: Record<LinkQuality, Tone> = {
   excellent: 'success',
@@ -353,14 +353,14 @@ function ClusterStatusBody({ status, t }: { status: ClusterStatus; t: TFunc }) {
 // SLO Status card
 // ---------------------------------------------------------------------------
 
-const SLO_TONE: Record<SloModelCompliance['status'], Tone> = {
+const SLO_TONE: Record<SloModelEntry['status'], Tone> = {
   met: 'success',
   breached: 'danger',
   insufficient_data: 'neutral',
 };
 
 function SloStatusCard({ t }: { t: TFunc }) {
-  const { data, isLoading, isError, error } = useSloCompliance(24);
+  const { data, isLoading, isError, error } = useSloComplianceFull(24);
 
   return (
     <Card title={t('slo.title')}>
@@ -386,8 +386,12 @@ function SloStatusCard({ t }: { t: TFunc }) {
               {data.models.map((m) => (
                 <tr key={m.model_id}>
                   <td>{m.model_id}</td>
-                  <td>{m.ttft_target_ms}</td>
-                  <td>{m.ttft_actual_compliance_pct.toFixed(1)}%</td>
+                  <td>{m.slo.ttft_ms}</td>
+                  <td>
+                    {m.actual.ttft_compliance !== null
+                      ? `${(m.actual.ttft_compliance * 100).toFixed(1)}%`
+                      : '—'}
+                  </td>
                   <td>
                     <Badge tone={SLO_TONE[m.status]}>
                       {m.status === 'met'

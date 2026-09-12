@@ -979,25 +979,7 @@ export interface WhatIfResult {
 // ---------------------------------------------------------------------------
 
 
-// SloModelCompliance is a legacy flat shape; SloModelEntry mirrors the actual
-// nested shape returned by slo.go (v0.6).
 // ---------------------------------------------------------------------------
-
-/** Legacy flat shape used by the FleetPage SloStatusCard. */
-export interface SloModelCompliance {
-  model_id: string;
-  ttft_target_ms: number;
-  ttft_actual_compliance_pct: number;
-  status: 'met' | 'breached' | 'insufficient_data';
-}
-
-
-/** Legacy wrapper. */
-export interface SloComplianceResponse {
-  models: SloModelCompliance[];
-  window_hours: number;
-}
-
 
 /** SLO contract parameters (per model or global default). */
 export interface SloContractConfig {
