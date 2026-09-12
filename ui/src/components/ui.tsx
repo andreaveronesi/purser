@@ -294,14 +294,19 @@ export function Meter({
   label: string;
   unit?: string;
 }) {
-  const ratio = total > 0 ? used / total : 0;
+  // Guard against null/undefined API responses (e.g. *float64 fields that the
+  // backend sends as null when a node has no GPU, or a quota that is unset).
+  // The TypeScript type says `number`, but real API payloads can differ.
+  const safeUsed = used ?? 0;
+  const safeTotal = total ?? 0;
+  const ratio = safeTotal > 0 ? safeUsed / safeTotal : 0;
   const tone = ratio > 0.9 ? 'danger' : ratio > 0.7 ? 'warning' : 'ok';
   return (
     <div className="meter">
       <div className="meter__row">
         <span className="meter__label">{label}</span>
         <span className="meter__value">
-          {used.toFixed(0)} / {total.toFixed(0)} {unit}
+          {safeUsed.toFixed(0)} / {safeTotal.toFixed(0)} {unit}
         </span>
       </div>
       <div
