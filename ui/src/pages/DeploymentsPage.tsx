@@ -14,9 +14,20 @@ import {
 import { IconArrowRight, IconLayers } from '../components/icons';
 import { useDeployments, useModelHealth, useNodes, useUndeploy } from '../hooks/queries';
 import { useT } from '../i18n';
+import type { StringKey } from '../i18n/en';
 import { useMemo } from 'react';
 import { errorMessage } from '../lib/errors';
 import type { Deployment, DeploymentState, ModelHealthStatus } from '../api/types';
+
+const STATE_LABEL: Record<DeploymentState, StringKey> = {
+  planned: 'deploy.state.planned',
+  provisioning: 'deploy.state.provisioning',
+  active: 'deploy.state.active',
+  rebalancing: 'deploy.state.rebalancing',
+  stopping: 'deploy.state.stopping',
+  stopped: 'deploy.state.stopped',
+  failed: 'deploy.state.failed',
+};
 
 const DEP_TONE: Record<DeploymentState, Tone> = {
   planned: 'info',
@@ -62,7 +73,7 @@ function DeploymentCard({
   const t = useT();
   const undeploy = useUndeploy();
   const heading = (state: DeploymentState): string =>
-    state === 'active' ? t('deploy.state.active') : t('deploy.state.provisioning');
+    t(STATE_LABEL[state] ?? 'deploy.state.provisioning');
 
   const onUndeploy = () => {
     if (window.confirm(t('deployments.undeployConfirm', { model: dep.plan.modelId }))) {

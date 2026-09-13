@@ -19,7 +19,7 @@ vi.mock('../hooks/queries', () => ({
 
 // TS helper: typed access to the mocked functions.
 import { useModelHealth, useDeployments } from '../hooks/queries';
-import type { Deployment } from '../api/types';
+import type { Deployment, DeploymentState } from '../api/types';
 const mockedUseModelHealth = vi.mocked(useModelHealth);
 const mockedUseDeployments = vi.mocked(useDeployments);
 
@@ -191,4 +191,79 @@ describe('DeploymentsPage — real API shape', () => {
       expect(screen.getByText('Active — the model is serving')).toBeInTheDocument()
     );
   });
+});
+
+// ---------------------------------------------------------------------------
+// DeploymentsPage — state label mapping (the core bug fix)
+// Failing-first proof: before the fix, 'stopped' renders "Rolling out …"
+// After the fix, each state must render its own label.
+// ---------------------------------------------------------------------------
+
+function makeDeployment(state: DeploymentState): Deployment {
+  return {
+    ...realShapedDeployment,
+    state,
+  };
+}
+
+describe('DeploymentsPage — state label per deployment state', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockedUseModelHealth.mockReturnValue({
+      data: { modelId: 'tinyllama-1b', status: 'healthy', deploymentId: 'dep-1', deploymentState: 'active', nodeCount: 1 },
+      isLoading: false,
+      isError: false,
+      error: null,
+      isPending: false,
+      isSuccess: true,
+    } as ReturnType<typeof useModelHealth>);
+  });
+
+  // Failing-first: STOPPED must NOT show the provisioning label.
+  it('stopped_deployment_shows_stopped_label_not_rolling_out', async () => {
+    mockedUseDeployments.mockReturnValue({
+      data: [makeDeployment('stopped')],
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useDeployments>);
+
+    renderDeploymentsPage();
+
+    await waitFor(() =>
+      expect(screen.getByText('Stopped — no longer serving')).toBeInTheDocument()
+    );
+    expect(screen.queryByText('Rolling out — nodes are loading')).not.toBeInTheDocument();
+  });
+
+  // Parametrized: every state must render its own dedicated label.
+  const STATE_EXPECTED: [DeploymentState, string][] = [
+    ['planned',      'Planned — not yet rolling out'],
+    ['provisioning', 'Rolling out — nodes are loading'],
+    ['active',       'Active — the model is serving'],
+    ['rebalancing',  'Rebalancing — redistributing layers'],
+    ['stopping',     'Stopping — tearing down'],
+    ['stopped',      'Stopped — no longer serving'],
+    ['failed',       'Failed — rollout did not complete'],
+  ];
+
+  it.each(STATE_EXPECTED)(
+    'state_%s_renders_label_%s',
+    async (state, expectedLabel) => {
+      mockedUseDeployments.mockReturnValue({
+        data: [makeDeployment(state)],
+        isLoading: false,
+        isError: false,
+        error: null,
+        refetch: vi.fn(),
+      } as unknown as ReturnType<typeof useDeployments>);
+
+      renderDeploymentsPage();
+
+      await waitFor(() =>
+        expect(screen.getByText(expectedLabel)).toBeInTheDocument()
+      );
+    }
+  );
 });

@@ -104,6 +104,20 @@ First, a correction that resolves most confusion: **there is no `PENDING`
 deployment state.** The lifecycle states are `PLANNED`, `PROVISIONING`, `ACTIVE`,
 `REBALANCING`, `STOPPING`, `STOPPED`, and `FAILED`.
 
+| State | Meaning |
+|---|---|
+| `PLANNED` | Deployment row created; rollout not yet started. |
+| `PROVISIONING` | Nodes are loading model layers (rolling out). |
+| `ACTIVE` | All assigned nodes are running; the model is serving requests. |
+| `REBALANCING` | A node change triggered layer redistribution; requests continue. |
+| `STOPPING` | Undeploy requested; nodes are tearing down their engines. |
+| `STOPPED` | All engines stopped; the deployment is no longer serving. |
+| `FAILED` | Rollout could not complete (e.g. a node crashed mid-load). |
+
+The operator dashboard badge on the Deployments page reflects each of these states
+with a distinct label and colour. If a deployment is `STOPPED` or `FAILED` it will
+**not** show "Rolling out" — those labels are state-specific.
+
 That matters because when a model cannot be planned, **no deployment row is
 created at all** — the deploy call itself returns `422` with
 `"error": "model_does_not_fit"` and a reason. There is nothing to get stuck. If
