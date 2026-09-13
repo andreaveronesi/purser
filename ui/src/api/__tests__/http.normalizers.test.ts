@@ -340,3 +340,127 @@ describe('getJoinInfo — real /join-token shape', () => {
     expect(info.expiresAt).toBe('2026-09-12T22:24:09Z');
   });
 });
+
+// ---------------------------------------------------------------------------
+// getSloComplianceFull — regression: camelizeKeys converts snake_case fields.
+// Before the fix, r.window_hours / r.generated_at / r.models[i].model_id
+// were undefined after camelization, so defaults were always used and page
+// field accesses like model.model_id / model.slo.ttft_ms returned undefined.
+// ---------------------------------------------------------------------------
+
+describe('getSloComplianceFull — SLO normalizer regression', () => {
+  const realSloResponse = {
+    window_hours: 48,
+    generated_at: '2026-09-12T00:00:00Z',
+    models: [
+      {
+        model_id: 'llama3-8b',
+        slo: { ttft_ms: 2000, tbt_ms: 500, target_compliance: 0.95 },
+        actual: {
+          ttft_compliance: 0.987,
+          tbt_compliance: null,
+          request_count: 1420,
+          period_start: '2026-09-07T21:00:00Z',
+        },
+        status: 'met',
+      },
+    ],
+  };
+
+  it('window_hours from backend is preserved (not replaced by the default 24)', async () => {
+    mockFetch(realSloResponse);
+    const r = await api.getSloComplianceFull(24);
+    expect(r.window_hours).toBe(48);
+  });
+
+  it('generated_at from backend is preserved (not replaced by new Date())', async () => {
+    mockFetch(realSloResponse);
+    const r = await api.getSloComplianceFull(24);
+    expect(r.generated_at).toBe('2026-09-12T00:00:00Z');
+  });
+
+  it('models array is populated', async () => {
+    mockFetch(realSloResponse);
+    const r = await api.getSloComplianceFull(24);
+    expect(r.models).toHaveLength(1);
+  });
+
+  it('model_id is preserved (not undefined after camelizeKeys)', async () => {
+    mockFetch(realSloResponse);
+    const r = await api.getSloComplianceFull(24);
+    expect(r.models[0].model_id).toBe('llama3-8b');
+  });
+
+  it('slo.ttft_ms is a number (not undefined after camelizeKeys)', async () => {
+    mockFetch(realSloResponse);
+    const r = await api.getSloComplianceFull(24);
+    expect(r.models[0].slo.ttft_ms).toBe(2000);
+  });
+
+  it('slo.tbt_ms is a number', async () => {
+    mockFetch(realSloResponse);
+    const r = await api.getSloComplianceFull(24);
+    expect(r.models[0].slo.tbt_ms).toBe(500);
+  });
+
+  it('slo.target_compliance is a number', async () => {
+    mockFetch(realSloResponse);
+    const r = await api.getSloComplianceFull(24);
+    expect(r.models[0].slo.target_compliance).toBeCloseTo(0.95, 2);
+  });
+
+  it('actual.ttft_compliance is the backend number (not undefined)', async () => {
+    mockFetch(realSloResponse);
+    const r = await api.getSloComplianceFull(24);
+    expect(r.models[0].actual.ttft_compliance).toBeCloseTo(0.987, 3);
+  });
+
+  it('actual.request_count is a number', async () => {
+    mockFetch(realSloResponse);
+    const r = await api.getSloComplianceFull(24);
+    expect(r.models[0].actual.request_count).toBe(1420);
+  });
+
+  it('status is preserved', async () => {
+    mockFetch(realSloResponse);
+    const r = await api.getSloComplianceFull(24);
+    expect(r.models[0].status).toBe('met');
+  });
+
+  it('null ttft_compliance survives as null (not NaN, not a throw)', async () => {
+    mockFetch({
+      window_hours: 24,
+      generated_at: '2026-09-12T00:00:00Z',
+      models: [
+        {
+          model_id: 'llama3-8b',
+          slo: { ttft_ms: 2000, tbt_ms: 500, target_compliance: 0.95 },
+          actual: {
+            ttft_compliance: null,
+            tbt_compliance: null,
+            request_count: 5,
+            period_start: '2026-09-07T21:00:00Z',
+          },
+          status: 'insufficient_data',
+        },
+      ],
+    });
+    const r = await api.getSloComplianceFull(24);
+    expect(r.models[0].actual.ttft_compliance).toBeNull();
+    expect(r.models[0].actual.tbt_compliance).toBeNull();
+    expect(r.models[0].status).toBe('insufficient_data');
+  });
+
+  it('empty models array is safe (no crash)', async () => {
+    mockFetch({ window_hours: 24, generated_at: '2026-09-12T00:00:00Z', models: [] });
+    const r = await api.getSloComplianceFull(24);
+    expect(r.models).toEqual([]);
+    expect(r.window_hours).toBe(24);
+  });
+
+  it('missing models key returns empty array', async () => {
+    mockFetch({ window_hours: 24, generated_at: '2026-09-12T00:00:00Z' });
+    const r = await api.getSloComplianceFull(24);
+    expect(r.models).toEqual([]);
+  });
+});

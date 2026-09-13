@@ -81,6 +81,7 @@ import type {
   ServiceAccount,
   ServiceAccountWithSecret,
   SloApiResponse,
+  SloModelEntry,
   Team,
   TeamBillingReport,
   TeamMember,
@@ -560,7 +561,7 @@ function normalizeNodeView(raw: unknown): NodeView {
     profile: profile as unknown as NodeView['profile'],
     metrics: null,
     role: null,
-    linkQuality: 'unknown',
+    linkQuality: (str(n.linkQuality, 'unknown') as LinkQuality) || 'unknown',
     deploymentId: null,
   };
 }
@@ -1181,10 +1182,44 @@ export function createHttpApi(baseUrl: string): PurserApi {
     getSloComplianceFull: (windowHours = 24): Promise<SloApiResponse> =>
       request<unknown>(`/slo/compliance?window_hours=${windowHours}`).then((raw) => {
         const r = (raw ?? {}) as Record<string, unknown>;
+        // camelizeKeys converts window_hours → windowHours and generated_at → generatedAt,
+        // so we must check both forms to handle direct snake_case pass-through too.
+        const wh = r.windowHours ?? r.window_hours;
+        const ga = r.generatedAt ?? r.generated_at;
+        const models: SloModelEntry[] = Array.isArray(r.models)
+          ? r.models.map((m: unknown): SloModelEntry => {
+              const e = (m ?? {}) as Record<string, unknown>;
+              // After camelizeKeys: model_id → modelId, slo.ttft_ms → slo.ttftMs, etc.
+              // Accept both so the normalizer tolerates any camelization state.
+              const slo = (e.slo ?? {}) as Record<string, unknown>;
+              const actual = (e.actual ?? {}) as Record<string, unknown>;
+              // ttft_compliance is *float64 in Go (nil → null); preserve null explicitly.
+              const ttftRaw = actual.ttftCompliance ?? actual.ttft_compliance;
+              const tbtRaw  = actual.tbtCompliance  ?? actual.tbt_compliance;
+              const status = str(e.status);
+              return {
+                model_id: str(e.modelId ?? e.model_id),
+                slo: {
+                  ttft_ms:           num(slo.ttftMs          ?? slo.ttft_ms,          2000),
+                  tbt_ms:            num(slo.tbtMs           ?? slo.tbt_ms,           500),
+                  target_compliance: num(slo.targetCompliance ?? slo.target_compliance, 0.95),
+                },
+                actual: {
+                  ttft_compliance: ttftRaw !== null && ttftRaw !== undefined ? num(ttftRaw) : null,
+                  tbt_compliance:  tbtRaw  !== null && tbtRaw  !== undefined ? num(tbtRaw)  : null,
+                  request_count:   num(actual.requestCount ?? actual.request_count),
+                  period_start:    str(actual.periodStart  ?? actual.period_start),
+                },
+                status: (['met', 'breached', 'insufficient_data'].includes(status)
+                  ? status
+                  : 'insufficient_data') as SloModelEntry['status'],
+              };
+            })
+          : [];
         return {
-          models: Array.isArray(r.models) ? (r.models as SloApiResponse['models']) : [],
-          window_hours: typeof r.window_hours === 'number' ? r.window_hours : windowHours,
-          generated_at: typeof r.generated_at === 'string' ? r.generated_at : new Date().toISOString(),
+          models,
+          window_hours: typeof wh === 'number' ? wh : windowHours,
+          generated_at: typeof ga === 'string' ? ga : new Date().toISOString(),
         };
       }),
 
@@ -1456,12 +1491,17 @@ function extractDescription(rego: string): string | undefined {
 
 function normPolicy(raw: Record<string, unknown>): Policy {
   const rego = typeof raw.rego === 'string' ? raw.rego : '';
+  // camelizeKeys converts created_at → createdAt; accept both for tolerance.
+  const createdAt =
+    typeof raw.createdAt === 'string' ? raw.createdAt :
+    typeof raw.created_at === 'string' ? raw.created_at :
+    new Date().toISOString();
   return {
     id: typeof raw.id === 'number' ? raw.id : 0,
     name: typeof raw.name === 'string' ? raw.name : '',
     source: rego,
     enabled: typeof raw.enabled === 'boolean' ? raw.enabled : true,
-    createdAt: typeof raw.created_at === 'string' ? raw.created_at : new Date().toISOString(),
+    createdAt,
     description: extractDescription(rego),
   };
 }
