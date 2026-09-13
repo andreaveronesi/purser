@@ -125,6 +125,106 @@ announcing the one-line `helm install` command. See `docs/postmortems/ghcr_visib
 
 ---
 
+## Running the demo stack locally (operator runbook)
+
+The demo stack is Docker Compose: **postgres + control-plane + gateway + ui + proxy**,
+all served from **one origin** via nginx at **http://localhost:3000** (`/` → UI,
+`/api/v1` → control-plane, `/v1` → gateway). Single-origin avoids browser CORS.
+Docker is rootful here → **`sudo docker …` for build**; `docker compose` (v2 plugin)
+works without sudo because the user is in the `docker` group, but in practice several
+recovery commands touch containers directly, so prefer `sudo docker …` when in doubt.
+
+### Start / stop / status
+
+```bash
+# START (default profile — mock, no real inference)
+sudo docker compose up -d
+# or: make demo   (same, + prints URLs and the demo API key demo-key-12345)
+
+# STATUS — always check with -a so you SEE crashed/exited containers, not just Up ones
+sudo docker compose ps -a
+
+# STOP (removes containers, KEEPS volumes: postgres data + downloaded models)
+sudo docker compose down --remove-orphans
+# or: make demo-stop   (plain `docker compose down`)
+
+# RESTART one service without touching the rest
+sudo docker compose up -d <service>          # e.g. control-plane, proxy
+sudo docker compose restart <service>        # restart in place
+```
+
+Two profiles (see the header comment in `docker-compose.yml`):
+`up -d` = **default** (mock engine); `--profile full up -d` = **real CPU inference**
+(adds `model-init` one-shot TinyLlama download + `agent`; needs
+`purser-agent:v0.6-llamacpp` built first). A fresh stack has **0 routable models** until
+you deploy one — the gateway route table is in-memory and starts empty
+(`make demo-seed` registers `tinyllama-1b`; then deploy it from the UI/API).
+
+### Making a change and seeing it in the stack
+
+Compose references **pre-built local image tags** (`purser-ui:v0.6-local`,
+`purser-control-plane:v0.6-local`, `purser-gateway:v0.6-local`) with **no `build:`
+stanza** — `up -d` will NOT rebuild from source. After changing code you must rebuild
+the affected image with the **exact tag compose expects**, then recreate that service:
+
+```bash
+# UI change:
+sudo docker build -f deploy/docker/ui.Dockerfile           -t purser-ui:v0.6-local .
+# Control-plane change:
+sudo docker build -f deploy/docker/control-plane.Dockerfile -t purser-control-plane:v0.6-local .
+# Gateway change:
+sudo docker build -f deploy/docker/gateway.Dockerfile       -t purser-gateway:v0.6-local .
+# then pick up the new image:
+sudo docker compose up -d --force-recreate <service>
+```
+
+**Exception — the nginx config** (`deploy/docker/demo-nginx.conf`) is a **`:ro` bind
+mount**, not baked into an image. Editing it does NOT need a rebuild, but a single-file
+bind mount **pins the inode**, so an in-place edit may not apply and `nginx -s reload`
+won't help — `sudo docker compose restart proxy` will. Run `sudo docker compose config`
+(a one-second syntax check) after any compose edit. See
+`docs/postmortems/demo_stack_fragility.md`.
+
+### The failure modes we actually hit — and the fix for each
+
+1. **Port already in use (`bind 0.0.0.0:9443` / `:8080`)** — a stray **native**
+   `bin/control-plane` (or a leftover container) is holding the port outside compose.
+   Find it and kill it: `sudo ss -ltnp | grep -E ':9443|:8080'` → `sudo kill <pid>`
+   (add `-9` if it lingers). Native e2e runs and manual `bin/*` launches are the usual
+   culprits; they can outlive their session by hours.
+2. **nginx proxy exits immediately with `host not found in upstream "control-plane"`** —
+   nginx resolves upstream hostnames once at boot, so it races ahead of the
+   control-plane's DNS name. Fix: bring the CP up first, then
+   `sudo docker compose up -d proxy`. It is why `ps -a` may show 4 Up + proxy `Exited (1)`.
+3. **Duplicate / overlapping containers** (`purser-proxy` AND `purser-proxy-1`) — two
+   different compose invocations left two sets; `down` only removes the ones matching the
+   current project name, and the leftover set keeps the network "in use". Clean slate:
+   `sudo docker compose down --remove-orphans` then `sudo docker rm -f <stray names>`.
+4. **`Exited (137)` (OOM/SIGKILL)** — the compose services are tiny (~10–45 MB each), so
+   137 is almost never the container being fat; it is the **host** OOM-killer under
+   memory pressure (usually a concurrent Rust/UI **build**, or the native+Docker CP
+   contention above), or a manual kill. The services have **no `restart:` policy**, so a
+   killed control-plane **stays dead** and the gateway then 503s (routes are push-only
+   from the CP). Recovery: `sudo docker compose up -d control-plane` (and restart proxy
+   per #2). Consider adding `restart: unless-stopped` to the long-lived services if this
+   recurs.
+5. **UI shows stale behaviour / an already-fixed bug** — the `*-local` image predates
+   your source. Rebuild it (see above); `up -d` alone will not.
+
+### Health check (paste to confirm the stack is actually serving, not just "Up")
+
+```bash
+for p in / /api/v1/cluster/health /api/v1/nodes /api/v1/models /v1/models; do
+  printf "  %-26s → %s\n" "$p" "$(curl -s -o /dev/null -w '%{http_code}' --max-time 3 http://localhost:3000$p)"
+done   # all 200 = healthy
+```
+
+Note there is also sometimes a **Vite dev server on :5173** (`npm run dev` in `ui/`) —
+that is UI-only hot-reload, unrelated to the Docker stack on :3000, and can go stale
+across days. Kill leftover `vite --port 5173` processes if they confuse things.
+
+---
+
 ## Documentation rule
 
 **Every feature epic includes a docs update in `website/docs/`.** No separate

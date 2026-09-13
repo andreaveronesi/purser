@@ -101,6 +101,38 @@ Both on the documented demo path, both pre-existing:
    Every visit to the documented `http://localhost:3000` returned **502**. The
    docs were right and the config was wrong.
 
+## Startup & lifecycle failures found bringing the stack back up (2026-09-13)
+
+A cold restart after ~a day surfaced three more, none derivable from the code:
+
+1. **Port 9443/8080 "address already in use" — a stray *native* control-plane.**
+   A `bin/control-plane` launched manually (or by a native e2e run) had been
+   holding `:9443` and `:8080` for **23h**, outside Docker. `docker compose up`
+   fails at the CP with `failed to bind host port 0.0.0.0:9443`. Find it with
+   `sudo ss -ltnp | grep -E ':9443|:8080'` and `kill` the PID (it shuts down
+   gracefully; `-9` if it lingers). Native `bin/*` processes routinely outlive
+   their session — check for them before blaming Docker.
+2. **nginx proxy exits `(1)` with `host not found in upstream "control-plane"`.**
+   nginx resolves every `proxy_pass` upstream hostname **once at boot**. If the
+   proxy container starts before the control-plane's DNS name is registered on the
+   compose network, it aborts immediately — so `docker compose ps -a` shows the
+   other four services `Up` and `proxy` `Exited (1)`, and `:3000` refuses
+   connections. Fix: `docker compose up -d proxy` again once the CP is up.
+   (`depends_on` orders *start*, not *readiness*, so the race can still occur.)
+   **Always use `ps -a`** when the stack looks half-up — a plain `ps` hides the
+   exited proxy.
+3. **`Exited (137)` is the host OOM-killer, not a fat container, and there is no
+   `restart:` policy.** The five services use ~10–45 MB each, so 137 came from
+   host memory pressure (a concurrent Rust/UI build, or the native+Docker CP
+   contention in #1) or a manual kill — *not* a compose memory cap (none is set).
+   Because no service declares `restart:`, a killed control-plane **stays dead**,
+   and the gateway then 503s (routes are push-only from the CP — see top of this
+   doc). Recovery is `docker compose up -d control-plane` + restart proxy (#2).
+   If it recurs, add `restart: unless-stopped` to the long-lived services.
+
+The operator runbook (start/stop/rebuild/health-check + these fixes) now lives in
+the root `CLAUDE.md` under "Running the demo stack locally".
+
 ## Rules that would have prevented this
 
 - Never point local infrastructure at `$CLAUDE_JOB_DIR/tmp`. Bring the stack up
@@ -112,3 +144,9 @@ Both on the documented demo path, both pre-existing:
   (`docker exec … cat`), not just the host's.
 - Any component holding state that another component pushes should be able to
   rebuild it. Ask "what happens if this restarts right now?" for every service.
+- Check for **stray native `bin/*` processes** holding ports before bringing the
+  Docker stack up; inspect stack state with `docker compose ps -a` (not `ps`) so
+  crashed containers are visible.
+- Compose references pre-built `*-local` image tags with **no `build:` stanza** —
+  `up -d` never rebuilds. After a code change, rebuild the tagged image and
+  `up -d --force-recreate <service>`, or the stack runs stale bytes.
