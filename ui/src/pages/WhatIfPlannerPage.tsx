@@ -117,10 +117,10 @@ function ResultPanel({ result, t }: { result: WhatIfResult; t: ReturnType<typeof
         <Badge tone={feasibleTone} data-testid="whatif-feasible-badge">
           {result.feasible ? t('planner.whatIf.result.feasible') : t('planner.whatIf.result.infeasible')}
         </Badge>
-        {result.current_plan !== undefined && (
+        {result.currentPlan !== undefined && (
           <span className="muted">
             {t('planner.whatIf.result.currentPlan', {
-              status: result.current_plan.feasible
+              status: result.currentPlan.feasible
                 ? t('planner.whatIf.result.feasible')
                 : t('planner.whatIf.result.infeasible'),
             })}
@@ -134,20 +134,20 @@ function ResultPanel({ result, t }: { result: WhatIfResult; t: ReturnType<typeof
 
       {result.feasible && (
         <>
-          {result.estimated_decode_tok_s_min !== undefined && result.estimated_decode_tok_s_max !== undefined && (
+          {result.estimatedDecodeTokSMin != null && result.estimatedDecodeTokSMax != null && (
             <p className="stat__value" style={{ marginBottom: '0.5rem' }}>
               {t('planner.whatIf.result.throughput', {
-                min: result.estimated_decode_tok_s_min.toFixed(0),
-                max: result.estimated_decode_tok_s_max.toFixed(0),
+                min: result.estimatedDecodeTokSMin.toFixed(0),
+                max: result.estimatedDecodeTokSMax.toFixed(0),
               })}
             </p>
           )}
 
-          {result.improvement_delta !== undefined && result.improvement_delta > 0 && (
+          {result.improvementDelta != null && result.improvementDelta > 0 && (
             <p style={{ marginBottom: '0.75rem' }}>
               <Badge tone="success">
                 {t('planner.whatIf.result.delta', {
-                  delta: (result.improvement_delta * 100).toFixed(0),
+                  delta: (result.improvementDelta * 100).toFixed(0),
                 })}
               </Badge>
             </p>
@@ -167,10 +167,10 @@ function ResultPanel({ result, t }: { result: WhatIfResult; t: ReturnType<typeof
                   </thead>
                   <tbody>
                     {result.assignments.map((a) => (
-                      <tr key={a.node_id}>
-                        <td><code>{a.node_id}</code></td>
-                        <td>{a.layer_start}</td>
-                        <td>{a.layer_end}</td>
+                      <tr key={a.nodeId}>
+                        <td><code>{a.nodeId}</code></td>
+                        <td>{a.layerStart}</td>
+                        <td>{a.layerEnd}</td>
                       </tr>
                     ))}
                   </tbody>

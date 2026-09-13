@@ -958,19 +958,26 @@ export interface WhatIfRequest {
   include_existing_nodes: boolean;
 }
 
+// NOTE: WhatIfAssignment and WhatIfResult are RESPONSE shapes — after
+// camelizeKeys() all field names are camelCase. WhatIfRequest / WhatIfNode are
+// REQUEST shapes sent verbatim to the API and stay snake_case.
 export interface WhatIfAssignment {
-  node_id: string;
-  layer_start: number;
-  layer_end: number;
+  nodeId: string;
+  layerStart: number;
+  layerEnd: number;
 }
 
 export interface WhatIfResult {
   feasible: boolean;
   assignments?: WhatIfAssignment[];
-  estimated_decode_tok_s_min?: number;
-  estimated_decode_tok_s_max?: number;
-  current_plan?: { feasible: boolean };
-  improvement_delta?: number;
+  /** Camelized from estimated_decode_tok_s_min */
+  estimatedDecodeTokSMin?: number | null;
+  /** Camelized from estimated_decode_tok_s_max */
+  estimatedDecodeTokSMax?: number | null;
+  /** Camelized from current_plan */
+  currentPlan?: { feasible: boolean };
+  /** Camelized from improvement_delta */
+  improvementDelta?: number | null;
   reason?: string;
 }
 
