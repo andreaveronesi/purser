@@ -1,7 +1,11 @@
 /**
- * FleetPage — additional coverage for capacity card, stream error banner,
+ * FleetPage — additional coverage for stream error banner,
  * node loading/error/empty states, live metrics in NodeRow, restart action,
- * FP4 badge, NodeDetailPanel optional fields, and hardwareSummary branches.
+ * FP4 badge, NodeDetailPanel optional fields, hardwareSummary branches, and
+ * the idle anchor banner.
+ *
+ * NOTE: CapacityCard tests were here before W2. They moved to DashboardPage.test.tsx
+ * because CapacityCard is now rendered on DashboardPage, not FleetPage.
  */
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
@@ -124,100 +128,8 @@ beforeEach(() => {
   mockStream = { snapshot: null, streamError: false };
 });
 
-// ---------------------------------------------------------------------------
-// Capacity card
-// ---------------------------------------------------------------------------
-
-describe('FleetPage — CapacityCard', () => {
-  it('shows LoadingBlock while capacity is loading', () => {
-    mockCapacity = { ...mockCapacity, isLoading: true };
-    render(<FleetPage />, { wrapper: Wrapper });
-    expect(screen.getByRole('status')).toBeInTheDocument();
-  });
-
-  it('shows ErrorState when capacity request fails', () => {
-    mockCapacity = { ...mockCapacity, isError: true, error: new Error('network error') };
-    render(<FleetPage />, { wrapper: Wrapper });
-    expect(screen.getByRole('alert')).toBeInTheDocument();
-  });
-
-  it('renders capacity stats when data is available', () => {
-    mockCapacity = { ...mockCapacity, data: makeCapacity({ readyNodeCount: 2, nodeCount: 3, gpuCount: 4 }) };
-    render(<FleetPage />, { wrapper: Wrapper });
-    // readyNodeCount renders alone; nodeCount appears as "common.of 3" text
-    // (with i18n mock the key is literal); gpuCount renders alone.
-    expect(screen.getByText('2')).toBeInTheDocument();
-    expect(screen.getByText('4')).toBeInTheDocument();
-    // Confirm nodeCount appears somewhere in the rendered output
-    expect(screen.getAllByText(/3/).length).toBeGreaterThanOrEqual(1);
-  });
-
-  it('renders FP4 badge when fp4Capable is true', () => {
-    mockCapacity = { ...mockCapacity, data: makeCapacity({ fp4Capable: true }) };
-    render(<FleetPage />, { wrapper: Wrapper });
-    expect(screen.getByText('fleet.capacity.fp4.yes')).toBeInTheDocument();
-  });
-
-  it('renders FP4 "not capable" badge when fp4Capable is false', () => {
-    mockCapacity = { ...mockCapacity, data: makeCapacity({ fp4Capable: false }) };
-    render(<FleetPage />, { wrapper: Wrapper });
-    expect(screen.getByText('fleet.capacity.fp4.no')).toBeInTheDocument();
-  });
-
-  it('shows live throughput from SSE stream aggregate when stream is active', () => {
-    mockCapacity = { ...mockCapacity, data: makeCapacity({ aggregateDecodeTokS: 1000 }) };
-    // Live snapshot overrides the static capacity value
-    mockStream = {
-      snapshot: { aggregateDecodeTokS: 2500, nodes: [] },
-      streamError: false,
-    };
-    render(<FleetPage />, { wrapper: Wrapper });
-    // tokS(2500) should be rendered; exact format depends on lib/format.ts
-    // Just verify the component renders without crashing with live data.
-    // The capacity card title is always present when data is loaded.
-    expect(screen.getByText('fleet.capacity.title')).toBeInTheDocument();
-  });
-
-  // --- E3 contract-gap fix: null RAM/VRAM → "not measured" -----------------
-
-  it('shows real GB values when ramTotalGb and vramTotalGb are non-null', () => {
-    mockCapacity = { ...mockCapacity, data: makeCapacity({ ramTotalGb: 64, ramAvailableGb: 32, vramTotalGb: 24, vramAvailableGb: 0 }) };
-    render(<FleetPage />, { wrapper: Wrapper });
-    // Meters show "used / total GB" — verify the total value appears somewhere
-    expect(screen.getByText('fleet.capacity.ram')).toBeInTheDocument();
-    expect(screen.getByText('fleet.capacity.vram')).toBeInTheDocument();
-    // Real values are rendered (not "not measured")
-    expect(screen.queryByText('common.notMeasured')).not.toBeInTheDocument();
-  });
-
-  it('shows "not measured" instead of a meter when ramTotalGb is null', () => {
-    // H2 regression: if the backend never sent ram_total_gb, the UI must say
-    // "not measured" instead of showing a 0/0 GB bar.
-    mockCapacity = { ...mockCapacity, data: makeCapacity({ ramTotalGb: null, ramAvailableGb: null }) };
-    render(<FleetPage />, { wrapper: Wrapper });
-    // At least one "not measured" label should be visible (for RAM).
-    expect(screen.getAllByText('common.notMeasured').length).toBeGreaterThanOrEqual(1);
-  });
-
-  it('shows "not measured" instead of a meter when vramTotalGb is null', () => {
-    mockCapacity = { ...mockCapacity, data: makeCapacity({ vramTotalGb: null, vramAvailableGb: null }) };
-    render(<FleetPage />, { wrapper: Wrapper });
-    expect(screen.getAllByText('common.notMeasured').length).toBeGreaterThanOrEqual(1);
-  });
-
-  it('shows 0 GB meter (NOT "not measured") when vramTotalGb is 0 (CPU-only cluster)', () => {
-    // VRAM=0 is a real measured value on CPU-only clusters. The brief ruling:
-    // "VRAM=0 su cluster CPU-only è un valore REALE, mostralo come 0, non 'non misurato'."
-    mockCapacity = { ...mockCapacity, data: makeCapacity({ vramTotalGb: 0, vramAvailableGb: 0 }) };
-    render(<FleetPage />, { wrapper: Wrapper });
-    // vram meter label should still appear (not replaced with "not measured")
-    expect(screen.getByText('fleet.capacity.vram')).toBeInTheDocument();
-    // 0/0 GB meter renders without showing "not measured"
-    expect(screen.queryAllByText('common.notMeasured').filter(
-      (el) => el.closest('.meter')?.previousElementSibling?.textContent?.includes('fleet.capacity.vram')
-    ).length).toBe(0);
-  });
-});
+// NOTE: CapacityCard tests moved to DashboardPage.test.tsx (W2 refactor —
+// CapacityCard now lives on DashboardPage, not FleetPage).
 
 // ---------------------------------------------------------------------------
 // Stream error banner

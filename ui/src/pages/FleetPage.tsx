@@ -7,7 +7,6 @@ import {
   EmptyState,
   ErrorState,
   LoadingBlock,
-  Meter,
   Modal,
   PageHeader,
   StatusPill,
@@ -16,18 +15,14 @@ import {
 import { IconServer } from '../components/icons';
 import {
   useCapacity,
-  useClusterStatus,
   useMetricsStream,
   useNodes,
   useNodeAction,
-  useReconcilerStatus,
-  useSloComplianceFull,
-  type ReconcilerStatus,
 } from '../hooks/queries';
 import { useT, type TFunc } from '../i18n';
 import { gb, tokS } from '../lib/format';
 import { errorMessage } from '../lib/errors';
-import type { ClusterCapacity, ClusterStatus, EngineMetrics, LinkQuality, NodeView, SloModelEntry } from '../api/types';
+import type { EngineMetrics, LinkQuality, NodeView } from '../api/types';
 
 const LINK_TONE: Record<LinkQuality, Tone> = {
   excellent: 'success',
@@ -37,85 +32,6 @@ const LINK_TONE: Record<LinkQuality, Tone> = {
   unknown: 'neutral',
 };
 
-function CapacityCard({
-  cap,
-  liveDecodeTokS,
-  t,
-}: {
-  cap: ClusterCapacity;
-  liveDecodeTokS?: number;
-  t: TFunc;
-}) {
-  // Prefer the live SSE aggregate when a metrics stream is active.
-  const decode = liveDecodeTokS ?? cap.aggregateDecodeTokS;
-  return (
-    <Card title={t('fleet.capacity.title')}>
-      <p className="muted capacity__hint">{t('fleet.capacity.hint')}</p>
-      <div className="stat-grid">
-        <div className="stat">
-          <span className="stat__value">
-            {cap.readyNodeCount}
-            <span className="stat__sub">
-              {' '}
-              {t('common.of')} {cap.nodeCount}
-            </span>
-          </span>
-          <span className="stat__label">{t('fleet.capacity.nodes')}</span>
-        </div>
-        <div className="stat">
-          <span className="stat__value">{cap.gpuCount}</span>
-          <span className="stat__label">{t('fleet.capacity.gpus')}</span>
-        </div>
-        <div className="stat">
-          <span className="stat__value" aria-live="polite">{tokS(decode)}</span>
-          <span className="stat__label">{t('fleet.capacity.throughput')}</span>
-        </div>
-        <div
-          className="stat"
-          title="FP4 (4-bit floating point) quantization acceleration. Reduces memory usage and increases throughput on compatible hardware."
-        >
-          <span className="stat__value">
-            <Badge tone={cap.fp4Capable ? 'success' : 'neutral'}>
-              {cap.fp4Capable ? t('fleet.capacity.fp4.yes') : t('fleet.capacity.fp4.no')}
-            </Badge>
-          </span>
-          <span className="stat__label">{t('fleet.capacity.fp4')}</span>
-        </div>
-      </div>
-      <div className="capacity__meters">
-        {cap.ramTotalGb !== null ? (
-          <Meter
-            used={(cap.ramTotalGb ?? 0) - (cap.ramAvailableGb ?? 0)}
-            total={cap.ramTotalGb ?? 0}
-            label={t('fleet.capacity.ram')}
-          />
-        ) : (
-          <div className="meter">
-            <div className="meter__row">
-              <span className="meter__label">{t('fleet.capacity.ram')}</span>
-              <span className="meter__value muted">{t('common.notMeasured')}</span>
-            </div>
-          </div>
-        )}
-        {cap.vramTotalGb !== null ? (
-          <Meter
-            used={(cap.vramTotalGb ?? 0) - (cap.vramAvailableGb ?? 0)}
-            total={cap.vramTotalGb ?? 0}
-            label={t('fleet.capacity.vram')}
-          />
-        ) : (
-          <div className="meter">
-            <div className="meter__row">
-              <span className="meter__label">{t('fleet.capacity.vram')}</span>
-              <span className="meter__value muted">{t('common.notMeasured')}</span>
-            </div>
-          </div>
-        )}
-      </div>
-    </Card>
-  );
-}
-
 function hardwareSummary(n: NodeView): string {
   const gpus = n.profile.gpus ?? [];
   const gpu =
@@ -124,313 +40,6 @@ function hardwareSummary(n: NodeView): string {
       : 'CPU only';
   const backends = n.profile.backends ?? [];
   return `${gpu} · ${gb(n.profile.ramTotalGb)} RAM${backends.length > 0 ? ` · ${backends.join('/')}` : ''}`;
-}
-
-/**
- * Shows the control-plane reconciler health status. Handles three states:
- *   - loading  → render nothing while the first fetch is in-flight (TODO: skeleton)
- *   - error    → the endpoint is absent or returned an error; show a neutral
- *                "Status unknown" badge so the operator knows the card is present
- *                but unavailable, rather than silently disappearing.
- *   - data     → state badge + pending/error counts + active event list +
- *                collapsible configuration panel.
- *
- * P-12: the previous `{reconcilerStatus.data && <ReconcilerStatusCard .../>}`
- * guard hid the card entirely during loading and on API error, making it
- * impossible for an operator to distinguish "reconciler not supported" from
- * "dashboard bug". This version keeps the card visible in all states.
- */
-export function ReconcilerStatusCard({
-  status,
-}: {
-  status: ReconcilerStatus | undefined;
-}) {
-  const STATE_TONE: Record<ReconcilerStatus['state'], Tone> = {
-    idle: 'success',
-    syncing: 'info',
-    error: 'danger',
-  };
-
-  if (!status) {
-    return (
-      <Card title="Reconciler">
-        <p>
-          <Badge tone="neutral">Status unknown</Badge>
-          {' '}
-          Reconciler status unknown
-        </p>
-      </Card>
-    );
-  }
-
-  // Active tracker events: only event types that currently have tracked > 0.
-  const activeEvents = Object.entries(status.tracker).filter(([, v]) => v.tracked > 0);
-
-  return (
-    <Card title="Reconciler">
-      <div className="stat-grid">
-        <div className="stat">
-          <span className="stat__value">
-            <Badge tone={STATE_TONE[status.state]}>{status.state}</Badge>
-          </span>
-          <span className="stat__label">State</span>
-        </div>
-        <div className="stat">
-          <span className="stat__value">{status.pendingCount}</span>
-          <span className="stat__label">Pending</span>
-        </div>
-        <div className="stat">
-          <span className="stat__value">{status.errorCount}</span>
-          <span className="stat__label">Errors</span>
-        </div>
-      </div>
-
-      {activeEvents.length > 0 && (
-        <div className="reconciler__events">
-          <p className="muted">Active events</p>
-          <div className="table-wrap">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th scope="col">Event type</th>
-                  <th scope="col">Tracked</th>
-                  <th scope="col">Age (s)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {activeEvents.map(([type, v]) => (
-                  <tr key={type}>
-                    <td><code>{type}</code></td>
-                    <td>{v.tracked}</td>
-                    <td>{v.oldestAgeS.toFixed(0)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      <details className="reconciler__config">
-        <summary className="muted">Configuration</summary>
-        <dl className="reconciler__config-grid">
-          <dt>Interval</dt>
-          <dd data-testid="cfg-interval">{status.config.intervalS}s</dd>
-          <dt>Node timeout</dt>
-          <dd data-testid="cfg-node-timeout">{status.config.nodeTimeoutS}s</dd>
-          <dt>Hysteresis</dt>
-          <dd>{status.config.hysteresisS}s</dd>
-          <dt>Action cooldown</dt>
-          <dd>{status.config.actionCooldownS}s</dd>
-        </dl>
-      </details>
-
-      {status.lastSyncAt && (
-        <p className="muted">
-          Last sync:{' '}
-          <time dateTime={status.lastSyncAt}>
-            {new Date(status.lastSyncAt).toLocaleString()}
-          </time>
-        </p>
-      )}
-    </Card>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// HA / Raft cluster status card
-//
-// Read-only view of the control-plane's high-availability topology, backed by
-// GET /api/v1/cluster/status (UNauthenticated). It handles four states:
-//   - loading  → spinner
-//   - error    → neutral "Status unknown" badge (endpoint unreachable)
-//   - standalone (single node, no HA) → informational; is_leader is always true
-//     and there are no peers. This is the normal shape for a single-node deploy
-//     and must NOT read as an error.
-//   - raft     → leader address, raft state, and peer count from the stats map.
-//
-// Mirrors the ReconcilerStatusCard pattern (Card + stat-grid + collapsible
-// details) so it sits naturally beside it on the Fleet page.
-// ---------------------------------------------------------------------------
-
-const RAFT_STATE_TONE: Record<string, Tone> = {
-  Leader: 'success',
-  Follower: 'info',
-  Candidate: 'warning',
-  Shutdown: 'danger',
-};
-
-export function ClusterStatusCard() {
-  const t = useT();
-  const { data, isLoading, isError } = useClusterStatus();
-
-  if (isLoading) {
-    return (
-      <Card title={t('clusterStatus.title')}>
-        <LoadingBlock />
-      </Card>
-    );
-  }
-
-  if (isError || !data) {
-    return (
-      <Card title={t('clusterStatus.title')}>
-        <p>
-          <Badge tone="neutral">{t('clusterStatus.unknown')}</Badge>{' '}
-          <span className="muted">{t('clusterStatus.unknownHint')}</span>
-        </p>
-      </Card>
-    );
-  }
-
-  return <ClusterStatusBody status={data} t={t} />;
-}
-
-function ClusterStatusBody({ status, t }: { status: ClusterStatus; t: TFunc }) {
-  // Standalone (single-node, no HA) — a normal, non-error state.
-  if (status.mode === 'standalone') {
-    return (
-      <Card title={t('clusterStatus.title')}>
-        <div className="stat-grid">
-          <div className="stat">
-            <span className="stat__value">
-              <Badge tone="neutral">{t('clusterStatus.standalone')}</Badge>
-            </span>
-            <span className="stat__label">{t('clusterStatus.stat.mode')}</span>
-          </div>
-          <div className="stat">
-            <span className="stat__value">
-              <Badge tone="success">{t('clusterStatus.thisLeader')}</Badge>
-            </span>
-            <span className="stat__label">{t('clusterStatus.stat.thisNode')}</span>
-          </div>
-        </div>
-        <p className="muted" style={{ marginBottom: 0 }}>{t('clusterStatus.standaloneHint')}</p>
-      </Card>
-    );
-  }
-
-  // Raft mode — surface leader, state, and peer count.
-  const stateStr = status.state ?? '';
-  const peers = status.stats?.numPeers ?? status.stats?.numVoters;
-  const peerCount = peers !== undefined ? Number(peers) : undefined;
-  // hashicorp/raft's num_peers excludes the local node; total members = peers + 1.
-  const members = peerCount !== undefined && isFinite(peerCount) ? peerCount + 1 : undefined;
-  const statEntries = status.stats ? Object.entries(status.stats) : [];
-
-  return (
-    <Card title={t('clusterStatus.title')}>
-      <div className="stat-grid">
-        {/* The raft `state` IS this node's role (Leader/Follower/Candidate),
-            so a separate "this node" indicator would be redundant. */}
-        <div className="stat">
-          <span className="stat__value">
-            <Badge tone={RAFT_STATE_TONE[stateStr] ?? 'neutral'}>
-              {stateStr || t('clusterStatus.stat.state')}
-            </Badge>
-          </span>
-          <span className="stat__label">{t('clusterStatus.stat.state')}</span>
-        </div>
-        {members !== undefined && (
-          <div className="stat">
-            <span className="stat__value">{members}</span>
-            <span className="stat__label">{t('clusterStatus.stat.members')}</span>
-          </div>
-        )}
-        {peerCount !== undefined && (
-          <div className="stat">
-            <span className="stat__value">{peerCount}</span>
-            <span className="stat__label">{t('clusterStatus.stat.peers')}</span>
-          </div>
-        )}
-      </div>
-
-      {status.leader && (
-        <p className="muted">
-          {t('clusterStatus.stat.leader')}:{' '}
-          <code className="inline-code" style={{ fontSize: '0.85em' }}>{status.leader}</code>
-        </p>
-      )}
-
-      {statEntries.length > 0 && (
-        <details className="reconciler__config">
-          <summary className="muted">{t('clusterStatus.stats')}</summary>
-          <dl className="reconciler__config-grid">
-            {statEntries.map(([k, v]) => (
-              <div key={k} style={{ display: 'contents' }}>
-                <dt><code style={{ fontFamily: 'var(--font-mono)', fontSize: '0.85em' }}>{k}</code></dt>
-                <dd>{v}</dd>
-              </div>
-            ))}
-          </dl>
-        </details>
-      )}
-
-      <p className="muted" style={{ marginBottom: 0 }}>{t('clusterStatus.raftHint')}</p>
-    </Card>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// SLO Status card
-// ---------------------------------------------------------------------------
-
-const SLO_TONE: Record<SloModelEntry['status'], Tone> = {
-  met: 'success',
-  breached: 'danger',
-  insufficient_data: 'neutral',
-};
-
-function SloStatusCard({ t }: { t: TFunc }) {
-  const { data, isLoading, isError, error } = useSloComplianceFull(24);
-
-  return (
-    <Card title={t('slo.title')}>
-      {isLoading && <LoadingBlock />}
-      {isError && (
-        <ErrorState message={errorMessage(error, t, 'error.slo')} />
-      )}
-      {data && data.models.length === 0 && (
-        <EmptyState message={t('slo.empty')} />
-      )}
-      {data && data.models.length > 0 && (
-        <div className="table-wrap">
-          <table className="table" data-testid="slo-table">
-            <thead>
-              <tr>
-                <th scope="col">{t('slo.col.model')}</th>
-                <th scope="col">{t('slo.col.ttftTarget')}</th>
-                <th scope="col">{t('slo.col.compliance')}</th>
-                <th scope="col">{t('slo.col.status')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.models.map((m) => (
-                <tr key={m.model_id}>
-                  <td>{m.model_id}</td>
-                  <td>{m.slo.ttft_ms}</td>
-                  <td>
-                    {m.actual.ttft_compliance !== null
-                      ? `${(m.actual.ttft_compliance * 100).toFixed(1)}%`
-                      : '—'}
-                  </td>
-                  <td>
-                    <Badge tone={SLO_TONE[m.status]}>
-                      {m.status === 'met'
-                        ? t('slo.status.met')
-                        : m.status === 'breached'
-                          ? t('slo.status.breached')
-                          : t('slo.status.insufficientData')}
-                    </Badge>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </Card>
-  );
 }
 
 // ---------------------------------------------------------------------------
@@ -871,7 +480,6 @@ export function FleetPage() {
   const t = useT();
   const capacity = useCapacity();
   const nodes = useNodes();
-  const reconcilerStatus = useReconcilerStatus();
   // Live hardware metrics via GET /api/v1/metrics (SSE). null until the first
   // frame arrives; each frame carries per-node engine metrics from heartbeats.
   const { snapshot: live, streamError } = useMetricsStream();
@@ -900,17 +508,6 @@ export function FleetPage() {
       <PageHeader title={t('fleet.title')} subtitle={t('fleet.subtitle')} />
       {streamError && (
         <Badge tone="warning">{t('fleet.metrics.stale')}</Badge>
-      )}
-
-      {capacity.isLoading && <LoadingBlock />}
-      {capacity.isError && (
-        <ErrorState
-          message={errorMessage(capacity.error, t, 'error.capacity')}
-          onRetry={() => capacity.refetch()}
-        />
-      )}
-      {capacity.data && (
-        <CapacityCard cap={capacity.data} liveDecodeTokS={live?.aggregateDecodeTokS} t={t} />
       )}
 
       {/* Idle anchor: nodes are ready but nothing is running. Guide the operator. */}
@@ -943,18 +540,6 @@ export function FleetPage() {
           </div>
         )}
 
-      {/* P-12: Reconciler card is always rendered (never conditionally hidden).
-          - isLoading: render nothing until the first response (TODO: skeleton)
-          - isError / no data: "Status unknown" badge — endpoint absent or unreachable
-          - data: full status card */}
-      {!reconcilerStatus.isLoading && (
-        <ReconcilerStatusCard status={reconcilerStatus.data} />
-      )}
-
-      <ClusterStatusCard />
-
-      <SloStatusCard t={t} />
-
       <Card title={t('fleet.title')}>
         {nodes.isLoading && <LoadingBlock />}
         {nodes.isError && (
@@ -968,7 +553,7 @@ export function FleetPage() {
             icon={<IconServer />}
             message={t('fleet.empty')}
             action={
-              <Link to="/" className="btn btn--primary btn--sm link-btn">
+              <Link to="/onboarding" className="btn btn--primary btn--sm link-btn">
                 {t('nav.onboarding')}
               </Link>
             }

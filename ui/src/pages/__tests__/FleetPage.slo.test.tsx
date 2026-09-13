@@ -1,19 +1,18 @@
 /**
- * FleetPage — SloStatusCard crash regression (TDD wave 1).
+ * DashboardPage — SloStatusCard crash regression (moved from FleetPage, W2 refactor).
  *
- * Reproduces the live crash: visiting /fleet threw
+ * Reproduces the original crash: visiting /fleet (now /dashboard) threw
  *   TypeError: Cannot read properties of undefined (reading 'toFixed')
- * because the pre-fix SloStatusCard called the flat legacy hook but the backend
- * returns the nested shape (SloModelEntry); rendering the non-existent flat field
- * m.ttft_actual_compliance_pct.toFixed(1) threw on the real shape.
+ * because the pre-fix SloStatusCard read the non-existent flat field
+ * m.ttft_actual_compliance_pct. After the fix, useSloComplianceFull is used
+ * with a null guard so compliance percentage renders correctly.
  *
- * Test order (TDD): written failing-first against the REAL backend nested shape,
- * then FleetPage was switched to useSloComplianceFull + a null guard so it renders
- * the compliance percentage (or '—' when ttft_compliance is null) instead of crashing.
+ * W2 note: SloStatusCard moved from FleetPage → DashboardPage. Tests updated
+ * to render DashboardPage which hosts the card.
  */
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { FleetPage } from '../FleetPage';
+import { DashboardPage } from '../DashboardPage';
 import { I18nProvider } from '../../i18n';
 import type { ReactNode } from 'react';
 import type { SloApiResponse } from '../../api/types';
@@ -58,21 +57,10 @@ const SLO_RESPONSE: SloApiResponse = {
 
 vi.mock('../../hooks/queries', () => ({
   useCapacity: () => ({ isLoading: false, isError: false, data: null }),
-  useNodes: () => ({
-    isLoading: false,
-    isError: false,
-    data: [],
-    refetch: vi.fn(),
-  }),
-  useMetricsStream: () => ({ snapshot: null, streamError: false }),
-  useNodeAction: () => ({
-    drain: { mutate: vi.fn(), isPending: false },
-    restart: { mutate: vi.fn(), isPending: false },
-    remove: { mutate: vi.fn(), isPending: false },
-  }),
   useReconcilerStatus: () => ({ isLoading: false, isError: false, data: undefined }),
+  useMetricsStream: () => ({ snapshot: null, streamError: false }),
   useClusterStatus: () => ({ isLoading: false, isError: false, data: undefined }),
-  // FleetPage's SloStatusCard consumes the nested v0.6 shape via useSloComplianceFull.
+  // DashboardPage's SloStatusCard consumes the nested v0.6 shape via useSloComplianceFull.
   // Feeding the REAL backend nested shape here is what reproduced the original crash
   // (the pre-fix code read the non-existent flat field m.ttft_actual_compliance_pct).
   useSloComplianceFull: () => ({ isLoading: false, isError: false, data: SLO_RESPONSE }),
@@ -90,22 +78,22 @@ function Wrapper({ children }: { children: ReactNode }) {
 
 // ---- tests ------------------------------------------------------------------
 
-describe('FleetPage — SloStatusCard crash regression', () => {
+describe('DashboardPage — SloStatusCard crash regression', () => {
   it('renders without throwing when backend returns nested SLO shape', () => {
     // Before fix: this throws TypeError: Cannot read properties of undefined
     //             (reading 'toFixed') because ttft_actual_compliance_pct is missing.
-    // After fix:  FleetPage uses useSloComplianceFull + guards actual.ttft_compliance.
-    expect(() => render(<FleetPage />, { wrapper: Wrapper })).not.toThrow();
+    // After fix:  DashboardPage's SloStatusCard uses useSloComplianceFull + guards.
+    expect(() => render(<DashboardPage />, { wrapper: Wrapper })).not.toThrow();
   });
 
   it('renders compliance percentage for models with data (98.7%)', () => {
-    render(<FleetPage />, { wrapper: Wrapper });
+    render(<DashboardPage />, { wrapper: Wrapper });
     // llama3-8b: actual.ttft_compliance = 0.987 → (0.987 * 100).toFixed(1) = "98.7"
     expect(screen.getByText('98.7%')).toBeInTheDocument();
   });
 
   it('renders "—" for models with null ttft_compliance (insufficient data)', () => {
-    render(<FleetPage />, { wrapper: Wrapper });
+    render(<DashboardPage />, { wrapper: Wrapper });
     // qwen3-235b: actual.ttft_compliance = null → render '—'
     expect(screen.getAllByText('—').length).toBeGreaterThan(0);
   });

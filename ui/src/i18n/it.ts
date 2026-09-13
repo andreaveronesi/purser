@@ -4,6 +4,7 @@ import type { StringKey } from './en';
 export const it: Record<StringKey, string> = {
   'app.name': 'Purser',
   'app.tagline': 'Inferenza LLM distribuita, sotto controllo.',
+  'nav.dashboard': 'Dashboard',
   'nav.onboarding': 'Inizia',
   'nav.gettingStarted': 'Introduzione',
   'nav.fleet': 'Flotta',
@@ -84,6 +85,13 @@ export const it: Record<StringKey, string> = {
     "L'agent contatta il control plane con il token di join, riceve un certificato client via mTLS e inizia a inviare heartbeat. Per l'enrollment di massa usa lo snippet Ansible/MDM — il token è l'unico segreto da distribuire.",
   'onboarding.goToFleet': 'Vai alla Flotta',
   'onboarding.mass.hint': 'Per molti nodi insieme, distribuisci il token col tuo strumento di config-management:',
+
+  // dashboard
+  'dashboard.title': 'Dashboard',
+  'dashboard.subtitle': 'Stato del cluster e panoramica della flotta.',
+  'dashboard.fleet.label': 'Visualizza nodi della flotta',
+  'dashboard.fleet.hint': 'Clicca per vedere i nodi in dettaglio →',
+  'dashboard.fleet.loading': 'Caricamento flotta…',
 
   'fleet.title': 'Flotta',
   'fleet.subtitle': 'Ogni nodo che contribuisce, con stato e carico in tempo reale.',

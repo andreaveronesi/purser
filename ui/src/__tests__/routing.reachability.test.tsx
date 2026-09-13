@@ -21,7 +21,15 @@ import { I18nProvider } from '../i18n';
 import { ThemeProvider } from '../lib/theme';
 
 vi.mock('../api/client', () => ({
-  api: new Proxy({}, { get: () => () => new Promise(() => {}) }),
+  // Most api methods: return a never-resolving promise so queries stay loading.
+  // streamMetrics is special: it must return a cleanup function (called on unmount),
+  // not a Promise, otherwise the effect cleanup throws "stop is not a function".
+  api: new Proxy({}, {
+    get: (_, prop) => {
+      if (prop === 'streamMetrics') return () => () => {};
+      return () => new Promise(() => {});
+    },
+  }),
   makeChat: vi.fn(() => ({
     baseUrl: '/v1',
     streamChat: vi.fn(),
@@ -48,6 +56,23 @@ function renderAt(path: string) {
 }
 
 describe('router reachability', () => {
+  it('/ renders DashboardPage (the new landing), not OnboardingPage', () => {
+    renderAt('/');
+    expect(screen.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeInTheDocument();
+    // Onboarding page title should not appear on the root route
+    expect(screen.queryByRole('heading', { level: 1, name: 'Add nodes to your cluster' })).not.toBeInTheDocument();
+  });
+
+  it('/onboarding renders OnboardingPage at its dedicated route', () => {
+    renderAt('/onboarding');
+    expect(screen.getByRole('heading', { level: 1, name: 'Add nodes to your cluster' })).toBeInTheDocument();
+  });
+
+  it('/fleet renders FleetPage', () => {
+    renderAt('/fleet');
+    expect(screen.getByRole('heading', { level: 1, name: 'Fleet' })).toBeInTheDocument();
+  });
+
   it('/api-keys renders ApiKeysPage, not ComingSoon', () => {
     renderAt('/api-keys');
     expect(screen.getByRole('heading', { level: 1, name: 'API Keys' })).toBeInTheDocument();

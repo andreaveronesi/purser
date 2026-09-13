@@ -7,6 +7,7 @@
 //   export const router = createHashRouter([...]);
 import { createBrowserRouter, type RouteObject } from 'react-router-dom';
 import { Layout } from './components/Layout';
+import { DashboardPage } from './pages/DashboardPage';
 import { OnboardingPage } from './pages/OnboardingPage';
 import { FleetPage } from './pages/FleetPage';
 import { CatalogPage } from './pages/CatalogPage';
@@ -44,7 +45,8 @@ export const routes: RouteObject[] = [
     path: '/',
     element: <Layout />,
     children: [
-      { index: true, element: <OnboardingPage /> },
+      { index: true, element: <DashboardPage /> },
+      { path: 'onboarding', element: <OnboardingPage /> },
       { path: 'fleet', element: <FleetPage /> },
       { path: 'catalog', element: <CatalogPage /> },
       { path: 'model-studio', element: <ModelStudioPage /> },

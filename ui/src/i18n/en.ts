@@ -4,6 +4,7 @@ export const en = {
   // brand / chrome
   'app.name': 'Purser',
   'app.tagline': 'Distributed LLM inference, under control.',
+  'nav.dashboard': 'Dashboard',
   'nav.onboarding': 'Get started',
   'nav.gettingStarted': 'Get Started',
   'nav.fleet': 'Fleet',
@@ -89,6 +90,13 @@ export const en = {
     'The agent contacts the control plane with the join token, is issued a client certificate over mTLS, then streams heartbeats. Mass-enroll with the Ansible/MDM snippet — the token is the only secret you distribute.',
   'onboarding.goToFleet': 'Go to Fleet',
   'onboarding.mass.hint': 'For many nodes at once, push the token via your config-management tool:',
+
+  // dashboard
+  'dashboard.title': 'Dashboard',
+  'dashboard.subtitle': 'Cluster health and fleet overview.',
+  'dashboard.fleet.label': 'View fleet nodes',
+  'dashboard.fleet.hint': 'Click to view nodes in detail →',
+  'dashboard.fleet.loading': 'Loading fleet…',
 
   // fleet
   'fleet.title': 'Fleet',

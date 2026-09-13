@@ -15,7 +15,7 @@ vi.mock('../../hooks/queries', () => ({
 }));
 
 import { useClusterStatus } from '../../hooks/queries';
-import { ClusterStatusCard } from '../FleetPage';
+import { ClusterStatusCard } from '../../components/cluster/ClusterCards';
 import type { ClusterStatus } from '../../api/types';
 
 function wrap(ui: ReactElement) {

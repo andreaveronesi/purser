@@ -12,7 +12,7 @@ import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { I18nProvider } from '../../i18n';
-import { ReconcilerStatusCard } from '../FleetPage';
+import { ReconcilerStatusCard } from '../../components/cluster/ClusterCards';
 import type { ReconcilerStatus } from '../../hooks/queries';
 
 /** Wrap a component in the providers required by ReconcilerStatusCard. */

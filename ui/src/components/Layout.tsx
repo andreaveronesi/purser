@@ -45,6 +45,7 @@ interface NavItem {
 // Day-to-day inference operations: what models are running, what's deployed,
 // how to test them. ML engineers live here.
 const INFERENCE: NavItem[] = [
+  { to: '/',            labelKey: 'nav.dashboard',   icon: <IconChart />, end: true },
   { to: '/fleet',       labelKey: 'nav.fleet',       icon: <IconServer /> },
   { to: '/catalog',     labelKey: 'nav.catalog',     icon: <IconGrid /> },
   { to: '/deployments', labelKey: 'nav.deployments', icon: <IconLayers /> },
@@ -85,9 +86,10 @@ const OBSERVABILITY: NavItem[] = [
 ];
 
 // ── ADMINISTRATION ────────────────────────────────────────────────────────────
-// Cluster management: enrolling new nodes and global settings.
+// Cluster management: enrolling new nodes, onboarding, and global settings.
 const ADMINISTRATION: NavItem[] = [
-  { to: '/join-token', labelKey: 'nav.joinTokens', icon: <IconPlus /> },
+  { to: '/onboarding', labelKey: 'nav.onboarding', icon: <IconPlus /> },
+  { to: '/join-token', labelKey: 'nav.joinTokens', icon: <IconServer /> },
   { to: '/config',     labelKey: 'nav.configCode', icon: <IconBox /> },
   { to: '/settings',   labelKey: 'nav.settings',   icon: <IconSettings /> },
 ];
