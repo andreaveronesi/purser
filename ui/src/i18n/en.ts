@@ -1017,6 +1017,24 @@ export const en = {
   'clusterStatus.unknown': 'Status unknown',
   'clusterStatus.unknownHint': 'Cluster status is unavailable — the endpoint may be unreachable.',
   'clusterStatus.stats': 'Raft stats',
+
+  // --- Auth / Login (v0.7) --------------------------------------------------
+  'auth.login.title': 'Sign in to Purser',
+  'auth.login.subtitle': 'Distributed LLM inference, under control.',
+  'auth.login.oidc.button': 'Sign in with OIDC',
+  'auth.login.ldap.title': 'Sign in with LDAP',
+  'auth.login.ldap.username': 'Username',
+  'auth.login.ldap.password': 'Password',
+  'auth.login.ldap.submit': 'Sign in',
+  'auth.login.ldap.error': 'Invalid credentials. Please try again.',
+  'auth.login.ldap.errorTitle': 'Sign-in failed',
+  'auth.login.ldap.notConfigured': 'LDAP is not configured on this server.',
+  'auth.devMode.title': 'Development mode',
+  'auth.devMode.body': 'No authentication is configured (OIDC and LDAP are both disabled). All users have full access.',
+  'auth.devMode.continue': 'Continue',
+  'auth.devMode.badge': 'Dev mode',
+  'nav.user.logout': 'Sign out',
+  'nav.user.devMode': 'Dev mode',
 } as const;
 
 export type StringKey = keyof typeof en;

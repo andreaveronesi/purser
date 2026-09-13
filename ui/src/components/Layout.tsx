@@ -9,6 +9,7 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useI18n, useT, LOCALES, type Locale } from '../i18n';
 import { useTheme } from '../lib/theme';
+import { useAuth } from '../lib/auth';
 import {
   IconBox,
   IconBuildingOffice,
@@ -177,6 +178,40 @@ function ThemeToggle() {
   );
 }
 
+/**
+ * Shows the current user identity in the topbar.
+ *
+ * Dev-mode: displays a neutral "Dev mode" badge — no real identity to show.
+ * Auth-configured: displays the user's email/actor + a logout button.
+ */
+function UserBar() {
+  const t = useT();
+  const { user, isDevMode } = useAuth();
+
+  if (isDevMode) {
+    return (
+      <span className="topbar__dev-badge" title={t('auth.devMode.body')}>
+        {t('auth.devMode.badge')}
+      </span>
+    );
+  }
+
+  if (!user) return null;
+
+  return (
+    <div className="topbar__user">
+      <span className="topbar__user-name">{user.email || user.actor}</span>
+      <button
+        className="btn btn--ghost btn--compact"
+        onClick={() => { window.location.href = '/auth/logout'; }}
+        type="button"
+      >
+        {t('nav.user.logout')}
+      </button>
+    </div>
+  );
+}
+
 export function Layout() {
   const t = useT();
   return (
@@ -208,6 +243,7 @@ export function Layout() {
         <header className="topbar">
           <div className="topbar__spacer" />
           <div className="topbar__actions">
+            <UserBar />
             <LanguagePicker />
             <ThemeToggle />
           </div>

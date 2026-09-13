@@ -994,4 +994,22 @@ export const it: Record<StringKey, string> = {
   'clusterStatus.unknown': 'Stato sconosciuto',
   'clusterStatus.unknownHint': 'Stato del cluster non disponibile — endpoint forse irraggiungibile.',
   'clusterStatus.stats': 'Statistiche Raft',
+
+  // --- Auth / Login (v0.7) --------------------------------------------------
+  'auth.login.title': 'Accedi a Purser',
+  'auth.login.subtitle': 'Inferenza LLM distribuita, sotto controllo.',
+  'auth.login.oidc.button': 'Accedi con OIDC',
+  'auth.login.ldap.title': 'Accedi con LDAP',
+  'auth.login.ldap.username': 'Nome utente',
+  'auth.login.ldap.password': 'Password',
+  'auth.login.ldap.submit': 'Accedi',
+  'auth.login.ldap.error': 'Credenziali non valide. Riprova.',
+  'auth.login.ldap.errorTitle': 'Accesso non riuscito',
+  'auth.login.ldap.notConfigured': 'LDAP non è configurato su questo server.',
+  'auth.devMode.title': 'Modalità sviluppo',
+  'auth.devMode.body': 'Nessuna autenticazione configurata (OIDC e LDAP sono entrambi disabilitati). Tutti gli utenti hanno accesso completo.',
+  'auth.devMode.continue': 'Continua',
+  'auth.devMode.badge': 'Modalità sviluppo',
+  'nav.user.logout': 'Esci',
+  'nav.user.devMode': 'Modalità sviluppo',
 };

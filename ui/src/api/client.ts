@@ -20,6 +20,7 @@ import type {
   AccessLogResponse,
   ApiKey,
   ApiKeyWithSecret,
+  CurrentUser,
   AuditLog,
   BillingForecastResponse,
   BillingReport,
@@ -266,7 +267,10 @@ export interface PurserApi {
   upsertPoolQuota(poolId: string, teamId: string, quota: Partial<PoolTeamQuota>): Promise<PoolTeamQuota>;
 
   // --- v0.4 platform model: current user ---
-  getMe(): Promise<{ actor: string; orgs: Organization[]; teams: Team[] }>;
+  getMe(): Promise<CurrentUser>;
+  /** POST /auth/ldap-login — authenticate with LDAP credentials. On success the
+   *  server sets a session cookie and returns 200. */
+  ldapLogin(username: string, password: string): Promise<void>;
   getMyTeamPermissions(teamId: string): Promise<EffectivePermissions>;
 
   // --- v0.4 RBAC: custom roles (org-scoped) + permission catalog ---

@@ -7,6 +7,8 @@
 //   export const router = createHashRouter([...]);
 import { createBrowserRouter, type RouteObject } from 'react-router-dom';
 import { Layout } from './components/Layout';
+import { ProtectedRoute } from './components/ProtectedRoute';
+import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { OnboardingPage } from './pages/OnboardingPage';
 import { FleetPage } from './pages/FleetPage';
@@ -40,10 +42,23 @@ import { ConfigCodePage } from './pages/ConfigCodePage';
 // Route table, exported separately from the configured `router` so tests can
 // build an isolated `createMemoryRouter(routes, { initialEntries })` against the
 // exact same config (see routing.reachability.test.tsx).
+//
+// ProtectedRoute wraps the app shell so unauthenticated users are redirected to
+// /login when auth is configured. In dev-mode (no OIDC configured) it is a
+// transparent pass-through, so all existing tests continue to work without
+// mounting an AuthProvider — the default context value is dev-mode.
 export const routes: RouteObject[] = [
+  // Public route — accessible without a session
+  { path: 'login', element: <LoginPage /> },
+
+  // Protected shell — all app routes live inside here
   {
     path: '/',
-    element: <Layout />,
+    element: (
+      <ProtectedRoute>
+        <Layout />
+      </ProtectedRoute>
+    ),
     children: [
       { index: true, element: <DashboardPage /> },
       { path: 'onboarding', element: <OnboardingPage /> },

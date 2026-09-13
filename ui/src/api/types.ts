@@ -761,6 +761,22 @@ export interface BillingSummary {
 }
 
 // ---------------------------------------------------------------------------
+// v0.7 Auth — current user from GET /api/v1/platform/users/me.
+// Wire sends snake_case; camelizeKeys normalizer converts before this shape.
+// ---------------------------------------------------------------------------
+
+/** Current authenticated user returned by GET /api/v1/platform/users/me. */
+export interface CurrentUser {
+  actor: string;
+  email: string;
+  role: string;
+  isPlatformAdmin: boolean;
+  isOrgAdmin: boolean;
+  orgs: Organization[];
+  teams: Team[];
+}
+
+// ---------------------------------------------------------------------------
 // v0.4 Platform model — Organizations, Teams, Node Pools, RBAC.
 // ---------------------------------------------------------------------------
 

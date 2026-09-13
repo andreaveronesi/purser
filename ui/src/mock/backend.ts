@@ -27,6 +27,7 @@ import type {
   RolesResponse,
   InferenceAuditResponse,
   JoinInfo,
+  CurrentUser,
   JoinTokenResult,
   KeyUsage,
   MetricsSnapshot,
@@ -815,8 +816,21 @@ export const mockBackend: PurserApi = {
     }, 350);
   },
 
-  getMe(): Promise<{ actor: string; orgs: Organization[]; teams: Team[] }> {
-    return delay({ actor: 'mock-user', orgs: [], teams: [] }, 200);
+  // In the mock backend LDAP login always succeeds (no real credential check).
+  ldapLogin(_username: string, _password: string): Promise<void> {
+    return delay(undefined, 200) as Promise<void>;
+  },
+
+  getMe(): Promise<CurrentUser> {
+    return delay({
+      actor: 'mock-user',
+      email: 'mock-user@example.com',
+      role: 'platform_admin',
+      isPlatformAdmin: true,
+      isOrgAdmin: false,
+      orgs: [],
+      teams: [],
+    }, 200);
   },
 
   getMyTeamPermissions(teamId): Promise<EffectivePermissions> {

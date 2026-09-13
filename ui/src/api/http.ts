@@ -22,6 +22,7 @@ import type {
   AccessLogParams,
   AccessLogResponse,
   ApiKey,
+  CurrentUser,
   ApiKeyWithSecret,
   Assignment,
   AuditEntry,
@@ -1177,7 +1178,26 @@ export function createHttpApi(baseUrl: string): PurserApi {
 
     // --- v0.4 platform model: current user ---
     getMe: () =>
-      request<{ actor: string; orgs: Organization[]; teams: Team[] }>('/platform/me'),
+      request<CurrentUser>('/platform/users/me'),
+
+    // Note: /auth/ldap-login is served by the auth router (not /api/v1), so we
+    // call fetch directly with an absolute path to avoid the /api/v1 base prefix.
+    ldapLogin: (username: string, password: string) =>
+      fetch('/auth/ldap-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ username, password }),
+      }).then(async (res) => {
+        if (!res.ok) {
+          const body: unknown = await res.json().catch(() => ({}));
+          const msg =
+            body && typeof body === 'object'
+              ? ((body as Record<string, unknown>).message ?? 'LDAP login failed')
+              : 'LDAP login failed';
+          throw new ApiError(res.status, String(msg));
+        }
+      }),
 
     getMyTeamPermissions: (teamId) =>
       request<EffectivePermissions>(`/platform/teams/${enc(teamId)}/my-permissions`),
