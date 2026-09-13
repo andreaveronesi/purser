@@ -90,12 +90,22 @@ function DeploymentCard({
             {dep.plan.quantization} · {dep.plan.assignments.length}{' '}
             {t('fleet.capacity.nodes').toLowerCase()}
           </p>
+          <p className="model-card__meta muted">
+            <span data-testid="dep-created-at">
+              {dep.createdAt ? dep.createdAt.slice(0, 10) : '—'}
+            </span>
+          </p>
         </div>
         <div className="dep-card__badges">
           <Badge tone={DEP_TONE[dep.state]}>{heading(dep.state)}</Badge>
           <DeploymentHealthBadge modelId={dep.plan.modelId} />
         </div>
       </div>
+      {dep.error && (
+        <p className="dep-card__error text--danger" data-testid="dep-error">
+          Error: {dep.error}
+        </p>
+      )}
       <ul className="dep-card__nodes">
         {dep.nodeStatus.map((s) => (
           <li key={s.nodeId}>

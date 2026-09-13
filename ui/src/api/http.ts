@@ -431,12 +431,18 @@ function normalizeDeployment(raw: unknown): Deployment {
       progress: state === 'active' ? 1 : 0,
       detail: '',
     }));
+    // Propagate detail.error (e.g. "host node-… not ready") so the UI can
+    // surface why a stopped/failed deployment has no nodes active.
+    const detailError = typeof detail.error === 'string' && detail.error ? detail.error : undefined;
     return {
       id: str(d.id, plan.planId),
       plan,
       state,
       nodeStatus,
-      createdAt: str(d.createdAt, new Date().toISOString()),
+      // Do NOT fabricate now() — an absent createdAt is represented as '' so
+      // the UI can show "—" instead of a misleading "just now" timestamp.
+      createdAt: str(d.createdAt),
+      ...(detailError !== undefined ? { error: detailError } : {}),
     };
   }
 
@@ -460,7 +466,9 @@ function normalizeDeployment(raw: unknown): Deployment {
     plan,
     state: normalizeDeploymentState(d.state),
     nodeStatus,
-    createdAt: str(d.createdAt, new Date().toISOString()),
+    // Do NOT fabricate now() for a missing createdAt — use '' so the UI
+    // renders "—" rather than a misleading "just now" timestamp.
+    createdAt: str(d.createdAt),
   };
 }
 

@@ -283,7 +283,14 @@ export interface Deployment {
   plan: DeploymentPlan;
   state: DeploymentState;
   nodeStatus: NodeLoadStatus[];
+  /** ISO-8601 creation timestamp; empty string when the backend omits it. */
   createdAt: string;
+  /**
+   * Human-readable error from the deployment detail, if any.
+   * Populated when state is `stopped` or `failed` and the backend emits
+   * `detail.error` (e.g. "host node-xyz not ready"). Absent otherwise.
+   */
+  error?: string;
 }
 
 /** Options an operator can override before/at deploy time. */

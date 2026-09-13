@@ -194,6 +194,125 @@ describe('DeploymentsPage — real API shape', () => {
 });
 
 // ---------------------------------------------------------------------------
+// DeploymentsPage — E4 fix: detail.error surfaced + no fabricated createdAt
+// ---------------------------------------------------------------------------
+
+describe('DeploymentsPage — E4: error surfacing and absent createdAt', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockedUseModelHealth.mockReturnValue({
+      data: { modelId: 'tinyllama-1b', status: 'unavailable', deploymentId: '', deploymentState: 'stopped', nodeCount: 0 },
+      isLoading: false,
+      isError: false,
+      error: null,
+      isPending: false,
+      isSuccess: true,
+    } as ReturnType<typeof useModelHealth>);
+  });
+
+  it('shows error message when deployment has a detail error', async () => {
+    // This shape reflects what normalizeDeployment produces after camelizeKeys
+    // when the API emits { detail: { error: "host node-xyz not ready", ... } }.
+    const depWithError: Deployment = {
+      ...realShapedDeployment,
+      state: 'stopped',
+      error: 'host node-10fb2f7a06f92660 not ready',
+      plan: {
+        ...realShapedDeployment.plan,
+        assignments: [], // engines: null → 0 assignments
+      },
+      nodeStatus: [],
+    };
+    mockedUseDeployments.mockReturnValue({
+      data: [depWithError],
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useDeployments>);
+
+    renderDeploymentsPage();
+
+    // The error should be rendered in the card
+    await waitFor(() =>
+      expect(screen.getByTestId('dep-error')).toBeInTheDocument()
+    );
+    expect(screen.getByTestId('dep-error')).toHaveTextContent(
+      'Error: host node-10fb2f7a06f92660 not ready'
+    );
+  });
+
+  it('shows 0 nodes alongside the error when engines was null', async () => {
+    const depWithError: Deployment = {
+      ...realShapedDeployment,
+      state: 'stopped',
+      error: 'host node-10fb2f7a06f92660 not ready',
+      plan: {
+        ...realShapedDeployment.plan,
+        assignments: [],
+      },
+      nodeStatus: [],
+    };
+    mockedUseDeployments.mockReturnValue({
+      data: [depWithError],
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useDeployments>);
+
+    renderDeploymentsPage();
+
+    await waitFor(() =>
+      expect(screen.getByTestId('dep-error')).toBeInTheDocument()
+    );
+    // "0 nodes" appears in the subtitle line
+    expect(screen.getByText(/0\s+nodes/i)).toBeInTheDocument();
+  });
+
+  it('shows dash for absent createdAt, not today\'s date', async () => {
+    const depNoDate: Deployment = {
+      ...realShapedDeployment,
+      state: 'stopped',
+      createdAt: '', // absent on wire → normalizer produces ''
+    };
+    mockedUseDeployments.mockReturnValue({
+      data: [depNoDate],
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useDeployments>);
+
+    renderDeploymentsPage();
+
+    await waitFor(() =>
+      expect(screen.getByTestId('dep-created-at')).toBeInTheDocument()
+    );
+    // Should show "—" not a fabricated today's date
+    expect(screen.getByTestId('dep-created-at')).toHaveTextContent('—');
+    // Verify today's date is NOT shown as createdAt
+    const todaySlice = new Date().toISOString().slice(0, 10);
+    expect(screen.getByTestId('dep-created-at')).not.toHaveTextContent(todaySlice);
+  });
+
+  it('does not show error element when deployment has no error', async () => {
+    mockedUseDeployments.mockReturnValue({
+      data: [realShapedDeployment],
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useDeployments>);
+
+    renderDeploymentsPage();
+
+    await waitFor(() => expect(screen.getByText('tinyllama-1b')).toBeInTheDocument());
+    expect(screen.queryByTestId('dep-error')).not.toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // DeploymentsPage — state label mapping (the core bug fix)
 // Failing-first proof: before the fix, 'stopped' renders "Rolling out …"
 // After the fix, each state must render its own label.

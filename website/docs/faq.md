@@ -118,6 +118,18 @@ The operator dashboard badge on the Deployments page reflects each of these stat
 with a distinct label and colour. If a deployment is `STOPPED` or `FAILED` it will
 **not** show "Rolling out" — those labels are state-specific.
 
+### Why does a STOPPED deployment show "0 nodes" with an error message?
+
+When the control plane cannot place a deployment (e.g. the assigned host node goes
+offline after scheduling), it records the reason in the deployment detail:
+`detail.error` (for example `"host node-abc123 not ready"`). The dashboard now
+surfaces that message directly below the `Stopped` state badge so you can see why
+the deployment stalled — it is not a UI corruption or a data problem.
+
+**Recovery:** the deployment is already stopped — there is nothing to undo. To
+bring the model back, go to **Catalog → Deploy** for the same model. The planner
+will reassign it to nodes that are currently `READY`.
+
 That matters because when a model cannot be planned, **no deployment row is
 created at all** — the deploy call itself returns `422` with
 `"error": "model_does_not_fit"` and a reason. There is nothing to get stuck. If
