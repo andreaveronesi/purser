@@ -12,7 +12,7 @@ metrics = "0.24.6"
 metrics-exporter-prometheus = { version = "0.18.3", default-features = false }
 zeroize = { workspace = true }
 base64 = "0.22"
-getrandom = "0.2"
+getrandom = "0.4"
 async-stream = "0.3.6"
 bytes = { workspace = true }
 foca = { workspace = true }
