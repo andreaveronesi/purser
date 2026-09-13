@@ -213,6 +213,18 @@ export const en = {
   'deployments.undeploy': 'Undeploy',
   'deployments.undeployConfirm': 'Stop and undeploy {model}? In-flight requests will be dropped.',
 
+  // deployments page — W1 usability: section grouping, clear labels, undeploy A
+  'deployments.section.active': 'Active deployments',
+  'deployments.section.inactive': 'Not serving',
+  'deployments.section.emptyActive': 'No active deployments.',
+  'deployments.action.configure': 'Configure and start',
+  'deployments.action.reconfigure': 'Reconfigure',
+  'deployments.hint.inactive': 'This deployment is stopped and not serving requests. Use "Configure and start" to make it active again.',
+  // health badge — "unavailable" renamed to avoid implying network unreachability
+  'deployments.health.healthy': 'Healthy',
+  'deployments.health.degraded': 'Degraded',
+  'deployments.health.unavailable': 'Not serving',
+
   // playground
   'playground.title': 'Playground',
   'playground.subtitle': 'Talk to your deployed model. Same OpenAI-compatible endpoint your apps will use.',

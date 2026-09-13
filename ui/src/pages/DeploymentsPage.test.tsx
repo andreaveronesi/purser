@@ -38,6 +38,21 @@ function renderDeploymentsPage() {
   );
 }
 
+/** Render DeploymentHealthBadge with the required I18nProvider context.
+ *  The badge now uses useT() to localise its labels, so a provider is needed. */
+function renderHealthBadge(modelId: string) {
+  const qc = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  return render(
+    <QueryClientProvider client={qc}>
+      <I18nProvider>
+        <DeploymentHealthBadge modelId={modelId} />
+      </I18nProvider>
+    </QueryClientProvider>,
+  );
+}
+
 // A real-API-shaped deployment (after normalization by http.ts).
 const realShapedDeployment: Deployment = {
   id: 'dep-0e1cc9e9715614e2e5a85f73',
@@ -79,7 +94,7 @@ describe('DeploymentHealthBadge', () => {
       isSuccess: true,
     } as ReturnType<typeof useModelHealth>);
 
-    render(<DeploymentHealthBadge modelId="llama-8b" />);
+    renderHealthBadge('llama-8b');
 
     expect(screen.getByText('Healthy')).toBeInTheDocument();
   });
@@ -100,7 +115,7 @@ describe('DeploymentHealthBadge', () => {
       isSuccess: true,
     } as ReturnType<typeof useModelHealth>);
 
-    render(<DeploymentHealthBadge modelId="llama-8b" />);
+    renderHealthBadge('llama-8b');
 
     expect(screen.getByText('Degraded')).toBeInTheDocument();
   });
@@ -122,7 +137,7 @@ describe('DeploymentHealthBadge', () => {
       isSuccess: true,
     } as ReturnType<typeof useModelHealth>);
 
-    render(<DeploymentHealthBadge modelId="llama-8b" />);
+    renderHealthBadge('llama-8b');
 
     // W1: the word "unavailable" is misleading (implies network unreachability).
     // The health badge for unavailable status must now read "Not serving".
@@ -140,7 +155,7 @@ describe('DeploymentHealthBadge', () => {
       isSuccess: false,
     } as ReturnType<typeof useModelHealth>);
 
-    render(<DeploymentHealthBadge modelId="llama-8b" />);
+    renderHealthBadge('llama-8b');
 
     // Loading state shows a neutral placeholder.
     expect(screen.getByText('—')).toBeInTheDocument();
@@ -462,8 +477,13 @@ describe('DeploymentsPage — W1: section headings', () => {
 
     renderDeploymentsPage();
 
-    await waitFor(() => expect(screen.getByText('Not serving')).toBeInTheDocument());
-    // The stopped card (tinyllama-1b) is in the document and the section heading is visible.
+    // Use getByRole('heading') to target the section h2 specifically — "Not serving"
+    // also appears as a health-badge label when health status is unavailable, so
+    // getByText would match multiple elements.
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'Not serving' })).toBeInTheDocument()
+    );
+    // The stopped card itself is visible inside the section.
     expect(screen.getByText('tinyllama-1b')).toBeInTheDocument();
   });
 });

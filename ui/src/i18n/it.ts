@@ -203,6 +203,18 @@ export const it: Record<StringKey, string> = {
   'deployments.undeploy': 'Rimuovi deploy',
   'deployments.undeployConfirm': 'Fermare e rimuovere il deploy di {model}? Le richieste in corso verranno interrotte.',
 
+  // deployments page — W1 usability: raggruppamento sezioni, label chiare, undeploy A
+  'deployments.section.active': 'Deployment attivi',
+  'deployments.section.inactive': 'Non in servizio',
+  'deployments.section.emptyActive': 'Nessun deployment attivo.',
+  'deployments.action.configure': 'Configura e avvia',
+  'deployments.action.reconfigure': 'Riconfigura',
+  'deployments.hint.inactive': 'Questo deployment è fermo e non sta servendo richieste. Usa "Configura e avvia" per renderlo di nuovo attivo.',
+  // badge salute — "unavailable" rinominato per evitare ambiguità di rete
+  'deployments.health.healthy': 'Sano',
+  'deployments.health.degraded': 'Degradato',
+  'deployments.health.unavailable': 'Non in servizio',
+
   'playground.title': 'Playground',
   'playground.subtitle': 'Parla col modello deployato. Lo stesso endpoint OpenAI-compatibile che useranno le tue app.',
   'playground.model': 'Modello',
