@@ -24,6 +24,13 @@ ENROLLED ──► READY ──► RUNNING
 | `NODE_STATE_DRAINING` | Node has been cordoned; new deployments will not be scheduled here. Existing deployments are not migrated automatically. |
 | `NODE_STATE_DECOMMISSIONED` | Node has been removed from the active fleet. Certificates are revoked. The record is retained in the registry for history. In the operator dashboard these nodes are labelled **Retired** and sorted to the bottom of the Fleet table. |
 
+**Operator dashboard layout (v0.7+):** The **Dashboard** (`/`) is the landing page.
+It shows cluster-level health cards — aggregate capacity, reconciler status, HA/Raft
+topology, and SLO compliance — plus a clickable fleet summary that links to the Fleet
+page. The **Fleet page** (`/fleet`) focuses on the node table: per-node status,
+hardware profile, live throughput metrics from the SSE stream, and node actions (drain,
+restart, decommission).
+
 When all your nodes are **Ready** but no model is deployed, the Fleet page shows a
 brief **idle banner** linking directly to the Model Catalog — a prompt to deploy
 your first model so that live throughput metrics start appearing.
