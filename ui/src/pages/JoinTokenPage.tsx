@@ -10,6 +10,7 @@ import {
 import { IconRefresh } from '../components/icons';
 import { useJoinInfo, useRotateToken } from '../hooks/queries';
 import { useT } from '../i18n';
+import { useCanAdmin } from '../lib/auth';
 import { config } from '../api/config';
 import { relativeTime } from '../lib/format';
 import { errorMessage } from '../lib/errors';
@@ -34,6 +35,7 @@ export function JoinTokenPage() {
   const t = useT();
   const { data: join, isLoading, isError, error, refetch } = useJoinInfo();
   const rotate = useRotateToken();
+  const canAdmin = useCanAdmin();
   const [ttl, setTtl] = useState<number>(86400);
   const [bundleStatus, setBundleStatus] = useState<BundleStatus>('idle');
 
@@ -70,7 +72,7 @@ export function JoinTokenPage() {
       {/* --- Join token card ------------------------------------------------ */}
       <Card
         title={t('join.token.label')}
-        action={
+        action={canAdmin ? (
           <Button
             variant="ghost"
             size="sm"
@@ -80,7 +82,7 @@ export function JoinTokenPage() {
             <IconRefresh />
             <span>{t('onboarding.token.rotate')}</span>
           </Button>
-        }
+        ) : null}
       >
         {isLoading && <LoadingBlock />}
         {isError && (
@@ -128,21 +130,23 @@ export function JoinTokenPage() {
             ))}
           </select>
 
-          <div
-            className="bundle-btn-wrap"
-            title={t('join.bundle.tooltip')}
-            aria-label={t('join.bundle.tooltip')}
-          >
-            <Button
-              variant="primary"
-              onClick={() => void downloadBundle()}
-              disabled={bundleStatus === 'loading'}
+          {canAdmin && (
+            <div
+              className="bundle-btn-wrap"
+              title={t('join.bundle.tooltip')}
+              aria-label={t('join.bundle.tooltip')}
             >
-              {bundleStatus === 'loading'
-                ? t('join.bundle.downloading')
-                : t('join.bundle.download')}
-            </Button>
-          </div>
+              <Button
+                variant="primary"
+                onClick={() => void downloadBundle()}
+                disabled={bundleStatus === 'loading'}
+              >
+                {bundleStatus === 'loading'
+                  ? t('join.bundle.downloading')
+                  : t('join.bundle.download')}
+              </Button>
+            </div>
+          )}
         </div>
 
         {bundleStatus === 'error' && (

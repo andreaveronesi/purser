@@ -368,8 +368,10 @@ describe('OrganizationsPage — delete org (confirm-first)', () => {
 // RBAC: 'Create org' button gating on isPlatformAdmin
 // ---------------------------------------------------------------------------
 
+type AuthProps = { isDevMode?: boolean; isAuthenticated?: boolean; user?: import('../api/types').CurrentUser | null };
+
 describe('OrganizationsPage — RBAC: create org button', () => {
-  function renderPageWithAuth(authProps: Parameters<typeof MockAuthProvider>[0]) {
+  function renderPageWithAuth(authProps: AuthProps) {
     return render(
       <MockAuthProvider {...authProps}>
         <MemoryRouter initialEntries={['/platform/orgs']}>

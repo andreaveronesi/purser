@@ -15,6 +15,13 @@ import { MockAuthProvider } from '../../test/auth-helpers';
 import { Layout } from '../Layout';
 import type { CurrentUser } from '../../api/types';
 
+// Convenience alias — auth props without the React children wrapper.
+type AuthProps = {
+  isDevMode?: boolean;
+  isAuthenticated?: boolean;
+  user?: CurrentUser | null;
+};
+
 // ---------------------------------------------------------------------------
 // Test infrastructure
 // ---------------------------------------------------------------------------
@@ -56,10 +63,7 @@ function makeViewer(overrides: Partial<CurrentUser> = {}): CurrentUser {
   };
 }
 
-function renderWithAuth(
-  authProps: Parameters<typeof MockAuthProvider>[0],
-  initialPath: string = '/',
-) {
+function renderWithAuth(authProps: AuthProps, initialPath: string = '/') {
   const router = makeRouter(initialPath);
   return render(
     <MockAuthProvider {...authProps}>

@@ -1012,4 +1012,7 @@ export const it: Record<StringKey, string> = {
   'auth.devMode.badge': 'Modalità sviluppo',
   'nav.user.logout': 'Esci',
   'nav.user.devMode': 'Modalità sviluppo',
+
+  // banner persistente modalità sviluppo (mostrato in Layout senza auth configurata)
+  'devmode.banner': 'Modalità sviluppo: autenticazione disabilitata — tutti gli accessi sono admin.',
 };

@@ -38,6 +38,7 @@ import {
 import { useT } from '../i18n';
 import type { TFunc } from '../i18n';
 import type { StringKey } from '../i18n/en';
+import { useCanOrgAdmin } from '../lib/auth';
 import { errorMessage } from '../lib/errors';
 import type { CustomRole, PermissionDescriptor, PermissionScope } from '../api/types';
 
@@ -343,6 +344,7 @@ function RoleRow({
 
 function RolesManager({ orgId }: { orgId: string }) {
   const t = useT();
+  const canOrgAdmin = useCanOrgAdmin();
   const { data, isLoading, isError, error, refetch } = useRoles(orgId);
   const [showCreate, setShowCreate] = useState(false);
   const [editRole, setEditRole] = useState<CustomRole | null>(null);
@@ -366,11 +368,11 @@ function RolesManager({ orgId }: { orgId: string }) {
       <PageHeader
         title={t('roles.title')}
         subtitle={t('roles.subtitle')}
-        actions={
+        actions={canOrgAdmin ? (
           <Button variant="primary" size="sm" onClick={() => setShowCreate(true)}>
             {t('roles.create')}
           </Button>
-        }
+        ) : null}
       />
       {breadcrumb}
 

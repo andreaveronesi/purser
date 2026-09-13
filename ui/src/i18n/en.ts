@@ -1035,6 +1035,9 @@ export const en = {
   'auth.devMode.badge': 'Dev mode',
   'nav.user.logout': 'Sign out',
   'nav.user.devMode': 'Dev mode',
+
+  // dev-mode persistent banner (shown in Layout when no auth is configured)
+  'devmode.banner': 'Development mode: authentication disabled — all users have admin access.',
 } as const;
 
 export type StringKey = keyof typeof en;

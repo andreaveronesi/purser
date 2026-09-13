@@ -22,6 +22,7 @@ import {
 } from '../components/ui';
 import { usePlatformUsers } from '../hooks/queries';
 import { useT } from '../i18n';
+import { useCanOrgAdmin } from '../lib/auth';
 import { relativeTime } from '../lib/format';
 import type { PlatformUser } from '../api/types';
 
@@ -257,6 +258,7 @@ function InviteInfoModal({ onClose }: { onClose: () => void }) {
 
 export function PlatformUsersPage() {
   const t = useT();
+  const canOrgAdmin = useCanOrgAdmin();
   const { data, isLoading, isError, error, refetch } = usePlatformUsers();
   const [orgFilter, setOrgFilter] = useState<string>('');
   const [showInvite, setShowInvite] = useState(false);
@@ -293,14 +295,16 @@ export function PlatformUsersPage() {
                 ))}
               </select>
             )}
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setShowInvite(true)}
-              data-testid="invite-user-btn"
-            >
-              Invite user
-            </Button>
+            {canOrgAdmin && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setShowInvite(true)}
+                data-testid="invite-user-btn"
+              >
+                Invite user
+              </Button>
+            )}
           </div>
         }
       />

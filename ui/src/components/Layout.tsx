@@ -214,6 +214,15 @@ function UserBar() {
 
 export function Layout() {
   const t = useT();
+  const { user, isDevMode, isAuthenticated } = useAuth();
+
+  // Section visibility predicates — filter what the sidebar shows.
+  // In dev-mode ALL predicates are true (no auth configured → full access).
+  // The backend enforces authorisation independently; this is UX-only.
+  const showInference     = isDevMode || isAuthenticated;
+  const showPlatformObs   = isDevMode || Boolean(user?.isPlatformAdmin) || Boolean(user?.isOrgAdmin);
+  const showAdministration = isDevMode || Boolean(user?.isPlatformAdmin);
+
   return (
     <div className="app-shell">
       <a href="#main" className="skip-link">
@@ -231,15 +240,32 @@ export function Layout() {
           </div>
         </div>
         <nav className="nav" aria-label={t('app.name')}>
-          <NavSection titleKey="nav.section.inference"     items={INFERENCE} />
-          <NavSection titleKey="nav.section.platform"      items={PLATFORM} />
-          <NavSection titleKey="nav.section.governance"    items={GOVERNANCE} />
-          <NavSection titleKey="nav.section.observability" items={OBSERVABILITY} />
-          <NavSection titleKey="nav.section.administration" items={ADMINISTRATION} />
+          {showInference     && <NavSection titleKey="nav.section.inference"      items={INFERENCE} />}
+          {showPlatformObs   && <NavSection titleKey="nav.section.platform"       items={PLATFORM} />}
+          {showPlatformObs   && <NavSection titleKey="nav.section.governance"     items={GOVERNANCE} />}
+          {showPlatformObs   && <NavSection titleKey="nav.section.observability"  items={OBSERVABILITY} />}
+          {showAdministration && <NavSection titleKey="nav.section.administration" items={ADMINISTRATION} />}
         </nav>
       </aside>
 
       <div className="content">
+        {isDevMode && (
+          <div
+            data-testid="devmode-banner"
+            className="devmode-banner"
+            style={{
+              padding: '0.35rem 1.25rem',
+              background: 'var(--color-warning-surface, #fef9c3)',
+              color: 'var(--color-warning-text, #92400e)',
+              borderBottom: '1px solid var(--color-warning-border, #fde68a)',
+              fontSize: '0.8rem',
+              fontWeight: 500,
+              letterSpacing: '0.01em',
+            }}
+          >
+            {t('devmode.banner')}
+          </div>
+        )}
         <header className="topbar">
           <div className="topbar__spacer" />
           <div className="topbar__actions">

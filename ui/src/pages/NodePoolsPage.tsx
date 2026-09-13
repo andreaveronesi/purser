@@ -28,6 +28,7 @@ import {
   useDeleteNodePool,
 } from '../hooks/queries';
 import { useT } from '../i18n';
+import { useCanOrgAdmin } from '../lib/auth';
 import { errorMessage } from '../lib/errors';
 import type { NodePool, PoolTeamQuota } from '../api/types';
 
@@ -466,16 +467,17 @@ function PoolRow({ pool }: PoolRowProps) {
 
 export function NodePoolsPage() {
   const t = useT();
+  const canOrgAdmin = useCanOrgAdmin();
   const [showCreate, setShowCreate] = useState(false);
 
   const { data, isLoading, isError, error, refetch } = useNodePools();
   const pools = data?.pools ?? [];
 
-  const pageActions = (
+  const pageActions = canOrgAdmin ? (
     <Button variant="primary" size="sm" onClick={() => setShowCreate(true)}>
       {t('platform.pools.createPool')}
     </Button>
-  );
+  ) : null;
 
   return (
     <div className="page">
@@ -498,11 +500,11 @@ export function NodePoolsPage() {
           <EmptyState
             icon={<IconServer />}
             message={t('platform.pools.noPools')}
-            action={
+            action={canOrgAdmin ? (
               <Button variant="primary" size="sm" onClick={() => setShowCreate(true)}>
                 {t('platform.pools.emptyCta')}
               </Button>
-            }
+            ) : undefined}
           />
         )}
 

@@ -28,6 +28,7 @@ import {
   useFieldId,
 } from '../components/ui';
 import { useT, type TFunc } from '../i18n';
+import { useCanAdmin } from '../lib/auth';
 import { errorMessage } from '../lib/errors';
 import { useConfigApply, useConfigDiff, useConfigExport } from '../hooks/queries';
 import type { ConfigApplyResult, ConfigDiff } from '../api/types';
@@ -224,6 +225,7 @@ function ApplyResultView({ result, t }: { result: ConfigApplyResult; t: TFunc })
 
 export function ConfigCodePage() {
   const t = useT();
+  const canAdmin = useCanAdmin();
   const exportQuery = useConfigExport();
   const diff = useConfigDiff();
   const apply = useConfigApply();
@@ -335,14 +337,16 @@ export function ConfigCodePage() {
           <Button variant="secondary" size="sm" onClick={handleDiff} disabled={!canSubmit || diff.isPending}>
             {diff.isPending ? '…' : t('configcode.action.diff')}
           </Button>
-          <Button
-            variant="danger"
-            size="sm"
-            onClick={() => setArmApply(true)}
-            disabled={!canSubmit || apply.isPending}
-          >
-            {t('configcode.action.apply')}
-          </Button>
+          {canAdmin && (
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={() => setArmApply(true)}
+              disabled={!canSubmit || apply.isPending}
+            >
+              {t('configcode.action.apply')}
+            </Button>
+          )}
         </div>
 
         {diff.isError && (
