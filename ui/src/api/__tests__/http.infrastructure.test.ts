@@ -467,12 +467,14 @@ describe('normalizeEnumStr — enum string normalization', () => {
 // ---------------------------------------------------------------------------
 
 describe('num / str / bool helper defaults', () => {
-  it('num() defaults fields to 0 when absent (cluster capacity)', async () => {
+  it('num() defaults numeric fields to 0 and numOrNull returns null when absent (cluster capacity)', async () => {
     mockFetch({ node_count: 3 }); // missing all other fields
     const cap = await api.getCapacity();
     expect(cap.nodeCount).toBe(3);
-    expect(cap.ramTotalGb).toBe(0);
-    expect(cap.vramTotalGb).toBe(0);
+    // ramTotalGb / vramTotalGb use numOrNull: absent field → null (not 0)
+    expect(cap.ramTotalGb).toBeNull();
+    expect(cap.vramTotalGb).toBeNull();
+    // gpuCount / aggregateDecodeTokS still use num: absent → 0
     expect(cap.gpuCount).toBe(0);
     expect(cap.aggregateDecodeTokS).toBe(0);
   });
@@ -1181,25 +1183,45 @@ describe('listPlatformUsers — user sub and org normalization', () => {
 });
 
 // ---------------------------------------------------------------------------
-// num helper — null coercion (L302 LogicalOperator && → || and ConditionalExpression → true)
+// numOrNull helper — distinguishes absent/null (→ null) from real 0 (→ 0)
+// Regression suite for the capacity normalizer after the E3 contract-gap fix:
+// RAM/VRAM fields use numOrNull so the UI can show "not measured" vs "0 GB".
 // ---------------------------------------------------------------------------
 
-describe('num helper — null input defaults to 0 (L302 mutations)', () => {
-  it('capacity field with explicit null returns 0 (kills L302 LogicalOperator && → || mutation)', async () => {
-    // Mutation: typeof v === 'number' && isFinite(v) → typeof v === 'number' || isFinite(v)
-    // With ||: isFinite(null) = isFinite(0) = true → condition true → returns null (wrong)
-    // Original &&: typeof null === 'number' = false → false && ... = false → returns default 0
+describe('numOrNull helper — capacity fields (E3 contract-gap fix)', () => {
+  it('null in payload → null in result (field absent from backend)', async () => {
+    // A server that predates v0.7 will send null for ram_total_gb.
+    // The UI must show "not measured", not "0 GB".
     mockFetch({ ram_total_gb: null, node_count: 1 });
     const cap = await api.getCapacity();
-    expect(cap.ramTotalGb).toBe(0);
+    expect(cap.ramTotalGb).toBeNull();
   });
 
-  it('capacity with null vram also defaults to 0 (kills L302 ConditionalExpression → true)', async () => {
-    // Mutation: (typeof v === 'number' && isFinite(v) ? v : d) → (true ? v : d) = always v
-    // With true: returns null for null input (wrong). Original returns d=0.
-    mockFetch({ vram_total_gb: null, node_count: 0 });
+  it('undefined in payload → null in result (field absent from backend)', async () => {
+    // Field completely missing from JSON → undefined after camelizeKeys → null.
+    mockFetch({ node_count: 1 }); // no ram_total_gb key
+    const cap = await api.getCapacity();
+    expect(cap.ramTotalGb).toBeNull();
+  });
+
+  it('0 in payload → 0 in result (CPU-only cluster: real measured value)', async () => {
+    // VRAM = 0 on a CPU-only cluster is a real, meaningful measurement.
+    // numOrNull must NOT convert it to null.
+    mockFetch({ vram_total_gb: 0, node_count: 2 });
     const cap = await api.getCapacity();
     expect(cap.vramTotalGb).toBe(0);
+  });
+
+  it('numeric vram value passes through unchanged', async () => {
+    mockFetch({ vram_total_gb: 48.0, node_count: 2 });
+    const cap = await api.getCapacity();
+    expect(cap.vramTotalGb).toBe(48.0);
+  });
+
+  it('numeric ram value passes through unchanged', async () => {
+    mockFetch({ ram_total_gb: 30.74, node_count: 2 });
+    const cap = await api.getCapacity();
+    expect(cap.ramTotalGb).toBeCloseTo(30.74, 2);
   });
 });
 

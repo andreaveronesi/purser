@@ -563,6 +563,11 @@
             "type": "string",
             "description": "ID of the cluster the token grants access to.",
             "example": "default"
+          },
+          "control_plane_url": {
+            "type": "string",
+            "description": "Address of this control-plane instance. Agents should use this as PURSER_CONTROL_PLANE_ADDR. Falls back to the listen address when no public URL is configured.",
+            "example": "https://purser.example.com:8443"
           }
         },
         "required": [
@@ -592,13 +597,27 @@
           "checked_at": {
             "type": "string",
             "format": "date-time"
+          },
+          "ram_total_gb": {
+            "type": "number",
+            "format": "double",
+            "description": "Total RAM in GB summed across all READY/RUNNING nodes (from hardware reported at enroll time). Decommissioned nodes are excluded.",
+            "example": 30.74
+          },
+          "vram_total_gb": {
+            "type": "number",
+            "format": "double",
+            "description": "Total VRAM in GB summed across all READY/RUNNING nodes. Zero on CPU-only clusters — this is a real measured value, not an absence of data.",
+            "example": 0
           }
         },
         "required": [
           "status",
           "total_nodes",
           "ready_nodes",
-          "checked_at"
+          "checked_at",
+          "ram_total_gb",
+          "vram_total_gb"
         ]
       },
       "EnterpriseStatusCommunity": {

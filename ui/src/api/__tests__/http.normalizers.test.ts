@@ -315,6 +315,23 @@ describe('getCapacity — real /cluster/health shape', () => {
     const cap = await api.getCapacity();
     expect(cap.readyNodeCount).toBe(2);
   });
+
+  // E3 fix: RAM/VRAM aggregate fields
+  it('maps ram_total_gb and vram_total_gb from the new fields', async () => {
+    mockFetch({ ...realHealthResponse, ram_total_gb: 30.74, vram_total_gb: 0 });
+    const cap = await api.getCapacity();
+    expect(cap.ramTotalGb).toBeCloseTo(30.74, 2);
+    // VRAM=0 is a real value on CPU-only clusters — must not become null
+    expect(cap.vramTotalGb).toBe(0);
+  });
+
+  it('returns null for ramTotalGb when field absent (pre-v0.7 backend)', async () => {
+    // Backends before v0.7 did not send ram_total_gb → null = "not measured"
+    mockFetch(realHealthResponse); // no ram_total_gb / vram_total_gb
+    const cap = await api.getCapacity();
+    expect(cap.ramTotalGb).toBeNull();
+    expect(cap.vramTotalGb).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -338,6 +355,31 @@ describe('getJoinInfo — real /join-token shape', () => {
     mockFetch(realJoinTokenResponse);
     const info = await api.getJoinInfo();
     expect(info.expiresAt).toBe('2026-09-12T22:24:09Z');
+  });
+
+  // E3 fix: control_plane_url field
+  it('maps control_plane_url → controlPlaneUrl when present', async () => {
+    mockFetch({ ...realJoinTokenResponse, control_plane_url: 'https://cp.example.com:8443' });
+    const info = await api.getJoinInfo();
+    expect(info.controlPlaneUrl).toBe('https://cp.example.com:8443');
+  });
+
+  it('falls back to window.location.origin when control_plane_url is absent', async () => {
+    // Servers without PublicAddr configured send an empty string or omit the field.
+    // The normalizer must fall back to window.location.origin so install commands
+    // are never empty.
+    mockFetch(realJoinTokenResponse); // no control_plane_url field
+    const info = await api.getJoinInfo();
+    // Use the actual jsdom origin — what matters is it's not empty
+    expect(info.controlPlaneUrl).toBe(window.location.origin);
+    expect(info.controlPlaneUrl).not.toBe('');
+  });
+
+  it('falls back to window.location.origin when control_plane_url is empty string', async () => {
+    mockFetch({ ...realJoinTokenResponse, control_plane_url: '' });
+    const info = await api.getJoinInfo();
+    expect(info.controlPlaneUrl).toBe(window.location.origin);
+    expect(info.controlPlaneUrl).not.toBe('');
   });
 });
 

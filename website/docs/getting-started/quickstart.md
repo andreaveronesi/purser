@@ -209,9 +209,17 @@ Response:
 {
   "token": "eyJleHAiOjE3ODkyMDAwMDAsIm5vbmNlIjoiNGYxYzhhMmJlOWQwNzYzNGE1YzFlOGYyOTBiM2Q3NDYifQ.KuWaWIO9iPAuISxsW5rXuVybY7Vr9BbWA7gGzUkQUSE",
   "expires_at": "2026-09-05T01:00:00Z",
-  "cluster_id": "default"
+  "cluster_id": "default",
+  "control_plane_url": "http://<control-plane-host>:8080"
 }
 ```
+
+The `control_plane_url` field contains the address agents should use for
+`PURSER_CONTROL_PLANE_ADDR`.  It is set from the `--public-addr` flag
+(or `PURSER_PUBLIC_ADDR` env var) when configured; otherwise it falls back to
+the listen address.  The Operator Dashboard's **Onboarding** page reads this
+field automatically to pre-fill the install commands — no manual copy-paste of
+the address is needed when the server is configured with a public URL.
 
 Copy the `token` value verbatim — it is an opaque signed string with no prefix,
 so any added or missing character invalidates it.

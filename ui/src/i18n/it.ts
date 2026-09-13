@@ -41,6 +41,7 @@ export const it: Record<StringKey, string> = {
   'common.loading': 'Caricamento…',
   'common.na': 'n/d',
   'common.of': 'di',
+  'common.notMeasured': '—',
 
   'error.title': 'Serve la tua attenzione',
   'empty.title': 'Ancora niente qui',

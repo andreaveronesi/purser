@@ -177,6 +177,46 @@ describe('FleetPage — CapacityCard', () => {
     // The capacity card title is always present when data is loaded.
     expect(screen.getByText('fleet.capacity.title')).toBeInTheDocument();
   });
+
+  // --- E3 contract-gap fix: null RAM/VRAM → "not measured" -----------------
+
+  it('shows real GB values when ramTotalGb and vramTotalGb are non-null', () => {
+    mockCapacity = { ...mockCapacity, data: makeCapacity({ ramTotalGb: 64, ramAvailableGb: 32, vramTotalGb: 24, vramAvailableGb: 0 }) };
+    render(<FleetPage />, { wrapper: Wrapper });
+    // Meters show "used / total GB" — verify the total value appears somewhere
+    expect(screen.getByText('fleet.capacity.ram')).toBeInTheDocument();
+    expect(screen.getByText('fleet.capacity.vram')).toBeInTheDocument();
+    // Real values are rendered (not "not measured")
+    expect(screen.queryByText('common.notMeasured')).not.toBeInTheDocument();
+  });
+
+  it('shows "not measured" instead of a meter when ramTotalGb is null', () => {
+    // H2 regression: if the backend never sent ram_total_gb, the UI must say
+    // "not measured" instead of showing a 0/0 GB bar.
+    mockCapacity = { ...mockCapacity, data: makeCapacity({ ramTotalGb: null, ramAvailableGb: null }) };
+    render(<FleetPage />, { wrapper: Wrapper });
+    // At least one "not measured" label should be visible (for RAM).
+    expect(screen.getAllByText('common.notMeasured').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('shows "not measured" instead of a meter when vramTotalGb is null', () => {
+    mockCapacity = { ...mockCapacity, data: makeCapacity({ vramTotalGb: null, vramAvailableGb: null }) };
+    render(<FleetPage />, { wrapper: Wrapper });
+    expect(screen.getAllByText('common.notMeasured').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('shows 0 GB meter (NOT "not measured") when vramTotalGb is 0 (CPU-only cluster)', () => {
+    // VRAM=0 is a real measured value on CPU-only clusters. The brief ruling:
+    // "VRAM=0 su cluster CPU-only è un valore REALE, mostralo come 0, non 'non misurato'."
+    mockCapacity = { ...mockCapacity, data: makeCapacity({ vramTotalGb: 0, vramAvailableGb: 0 }) };
+    render(<FleetPage />, { wrapper: Wrapper });
+    // vram meter label should still appear (not replaced with "not measured")
+    expect(screen.getByText('fleet.capacity.vram')).toBeInTheDocument();
+    // 0/0 GB meter renders without showing "not measured"
+    expect(screen.queryAllByText('common.notMeasured').filter(
+      (el) => el.closest('.meter')?.previousElementSibling?.textContent?.includes('fleet.capacity.vram')
+    ).length).toBe(0);
+  });
 });
 
 // ---------------------------------------------------------------------------

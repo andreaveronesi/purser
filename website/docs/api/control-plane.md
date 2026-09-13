@@ -624,7 +624,8 @@ This legacy URL will be removed in v0.6.
 
 ### `GET /api/v1/cluster/health`
 
-Reports a coarse cluster health summary (DB reachability + node counts).
+Reports a coarse cluster health summary (DB reachability + node counts + capacity
+aggregates).
 
 **Response `200`:**
 
@@ -633,7 +634,9 @@ Reports a coarse cluster health summary (DB reachability + node counts).
   "status": "ok",
   "total_nodes": 3,
   "ready_nodes": 3,
-  "checked_at": "2026-09-05T00:00:00Z"
+  "checked_at": "2026-09-05T00:00:00Z",
+  "ram_total_gb": 46.11,
+  "vram_total_gb": 0
 }
 ```
 
@@ -642,6 +645,17 @@ Reports a coarse cluster health summary (DB reachability + node counts).
 - `"degraded"` — nodes exist but none is ready
 - `"empty"` — no nodes enrolled
 - `"unavailable"` — database is unreachable (response is `503`)
+
+**Capacity fields (v0.7+):**
+
+| Field | Description |
+|---|---|
+| `ram_total_gb` | Sum of system RAM (GB) across all `READY`/`RUNNING` nodes, from the hardware profile reported at enrollment. Decommissioned nodes are excluded. |
+| `vram_total_gb` | Sum of GPU VRAM (GB) across all `READY`/`RUNNING` nodes. **`0` is a real, measured value** on CPU-only clusters — it is not an indicator of missing data. |
+
+The Operator Dashboard Fleet page reads these fields to populate the RAM/VRAM
+capacity meters.  When a backend predating v0.7 is used these fields are absent
+and the UI shows "—" instead of a meter.
 
 ---
 

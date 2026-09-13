@@ -227,10 +227,23 @@ export interface NodeView {
 export interface ClusterCapacity {
   nodeCount: number;
   readyNodeCount: number;
-  ramTotalGb: number;
-  ramAvailableGb: number;
-  vramTotalGb: number;
-  vramAvailableGb: number;
+  /**
+   * Total RAM in GB summed across READY/RUNNING nodes, or null when the
+   * backend did not report this field (e.g. nodes enrolled before v0.7
+   * that have no hardware profile). null → show "not measured"; 0 is a
+   * real value (CPU-only cluster with no RAM data yet).
+   */
+  ramTotalGb: number | null;
+  /** Available RAM in GB, or null when not reported. */
+  ramAvailableGb: number | null;
+  /**
+   * Total VRAM in GB. null means the field is absent from the response.
+   * 0 is the real measured value for CPU-only clusters — show "0 GB",
+   * not "not measured".
+   */
+  vramTotalGb: number | null;
+  /** Available VRAM in GB, or null when not reported. */
+  vramAvailableGb: number | null;
   gpuCount: number;
   /** union of backends present across the fleet */
   backends: Backend[];

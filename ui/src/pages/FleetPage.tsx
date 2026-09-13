@@ -83,12 +83,34 @@ function CapacityCard({
         </div>
       </div>
       <div className="capacity__meters">
-        <Meter used={cap.ramTotalGb - cap.ramAvailableGb} total={cap.ramTotalGb} label={t('fleet.capacity.ram')} />
-        <Meter
-          used={cap.vramTotalGb - cap.vramAvailableGb}
-          total={cap.vramTotalGb}
-          label={t('fleet.capacity.vram')}
-        />
+        {cap.ramTotalGb !== null ? (
+          <Meter
+            used={(cap.ramTotalGb ?? 0) - (cap.ramAvailableGb ?? 0)}
+            total={cap.ramTotalGb ?? 0}
+            label={t('fleet.capacity.ram')}
+          />
+        ) : (
+          <div className="meter">
+            <div className="meter__row">
+              <span className="meter__label">{t('fleet.capacity.ram')}</span>
+              <span className="meter__value muted">{t('common.notMeasured')}</span>
+            </div>
+          </div>
+        )}
+        {cap.vramTotalGb !== null ? (
+          <Meter
+            used={(cap.vramTotalGb ?? 0) - (cap.vramAvailableGb ?? 0)}
+            total={cap.vramTotalGb ?? 0}
+            label={t('fleet.capacity.vram')}
+          />
+        ) : (
+          <div className="meter">
+            <div className="meter__row">
+              <span className="meter__label">{t('fleet.capacity.vram')}</span>
+              <span className="meter__value muted">{t('common.notMeasured')}</span>
+            </div>
+          </div>
+        )}
       </div>
     </Card>
   );

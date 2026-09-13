@@ -42,6 +42,7 @@ export const en = {
   'common.loading': 'Loading…',
   'common.na': 'n/a',
   'common.of': 'of',
+  'common.notMeasured': '—',
 
   // error/empty primitives
   'error.title': 'Something needs your attention',

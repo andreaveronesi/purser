@@ -303,6 +303,15 @@ const num = (v: unknown, d = 0): number => (typeof v === 'number' && isFinite(v)
 const str = (v: unknown, d = ''): string => (typeof v === 'string' ? v : d);
 const bool = (v: unknown, d = false): boolean => (typeof v === 'boolean' ? v : d);
 
+/**
+ * Like `num`, but returns null when the value is absent (undefined / null)
+ * rather than defaulting to 0.  Use for fields where zero is a real, valid
+ * measurement (e.g. VRAM on a CPU-only cluster) and the caller must
+ * distinguish "the backend didn't send this field" from "the backend sent 0".
+ */
+const numOrNull = (v: unknown): number | null =>
+  v === undefined || v === null ? null : (typeof v === 'number' && isFinite(v) ? v : null);
+
 /** Normalize a proto-style UPPER_CASE enum string to its short lowercase form.
  *  e.g. "NODE_STATE_READY" → "ready", "BACKEND_CPU" → "cpu", "OS_LINUX" → "linux".
  *  If the value already matches a known lowercase form it is returned unchanged.
@@ -494,10 +503,12 @@ function normalizeCapacity(raw: unknown): ClusterCapacity {
     // nodeCount/readyNodeCount. Accept both.
     nodeCount: num(c.nodeCount !== undefined ? c.nodeCount : c.totalNodes),
     readyNodeCount: num(c.readyNodeCount !== undefined ? c.readyNodeCount : c.readyNodes),
-    ramTotalGb: num(c.ramTotalGb),
-    ramAvailableGb: num(c.ramAvailableGb),
-    vramTotalGb: num(c.vramTotalGb),
-    vramAvailableGb: num(c.vramAvailableGb),
+    // Use numOrNull so that an absent field becomes null ("not measured") while
+    // an explicit 0 from the backend (CPU-only cluster) stays 0 (real value).
+    ramTotalGb: numOrNull(c.ramTotalGb),
+    ramAvailableGb: numOrNull(c.ramAvailableGb),
+    vramTotalGb: numOrNull(c.vramTotalGb),
+    vramAvailableGb: numOrNull(c.vramAvailableGb),
     gpuCount: num(c.gpuCount),
     backends: Array.isArray(c.backends) ? (c.backends as Backend[]) : [],
     fp4Capable: bool(c.fp4Capable),
@@ -645,11 +656,17 @@ function normalizeFit(raw: unknown, model: ModelSpec, deployable: unknown): FitV
 
 function normalizeJoinInfo(raw: unknown): JoinInfo {
   const j = (raw ?? {}) as Record<string, unknown>;
+  // The server includes control_plane_url (→ controlPlaneUrl after camelizeKeys)
+  // when it has a configured PublicAddr.  Fall back to the browser origin so
+  // install commands never contain an empty --control-plane argument.
+  const serverUrl = str(j.controlPlaneUrl);
+  const controlPlaneUrl =
+    serverUrl !== '' ? serverUrl : (typeof window !== 'undefined' ? window.location.origin : '');
   return {
     // API returns "token" in the wire format (camelizeKeys keeps it as "token").
     // Support both "joinToken" (legacy) and "token" (current) for back-compat.
     joinToken: str(j.joinToken ?? j.token),
-    controlPlaneUrl: str(j.controlPlaneUrl),
+    controlPlaneUrl,
     expiresAt: str(j.expiresAt ?? j.expiresAt),
   };
 }

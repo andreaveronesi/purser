@@ -268,4 +268,34 @@ describe('OnboardingPage', () => {
     const fleetLink = screen.getByRole('link', { name: /onboarding\.goToFleet/i });
     expect(fleetLink).toHaveAttribute('href', '/fleet');
   });
+
+  // --- control_plane_url contract (E3 fix) ------------------------------------
+
+  it('install command contains non-empty URL when controlPlaneUrl is set', () => {
+    mockUseJoinInfo.mockReturnValue(success(joinInfo) as unknown as ReturnType<typeof useJoinInfo>);
+    renderPage();
+
+    // The linux snippet uses controlPlaneUrl in the curl and --control-plane args.
+    // It must never be empty so the agent command is valid.
+    const codeBlocks = document.querySelectorAll('[aria-label]');
+    let foundUrl = false;
+    codeBlocks.forEach((el) => {
+      if (el.textContent && el.textContent.includes('https://cp.example.com')) {
+        foundUrl = true;
+      }
+    });
+    // Also check via screen queries
+    expect(screen.getAllByText(/https:\/\/cp\.example\.com/).length).toBeGreaterThan(0);
+    expect(foundUrl).toBe(true);
+  });
+
+  it('install command does NOT contain empty --control-plane when URL is set', () => {
+    mockUseJoinInfo.mockReturnValue(success(joinInfo) as unknown as ReturnType<typeof useJoinInfo>);
+    renderPage();
+
+    // The linux snippet must not have a bare `--control-plane ` with nothing after it.
+    const content = document.body.textContent ?? '';
+    expect(content).not.toMatch(/--control-plane\s+\\?\s*$/m);
+    expect(content).not.toContain('--control-plane  ');
+  });
 });

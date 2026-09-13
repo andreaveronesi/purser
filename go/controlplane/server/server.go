@@ -2798,10 +2798,15 @@ type ClusterHealth struct {
 	TotalNodes int       `json:"total_nodes"`
 	ReadyNodes int       `json:"ready_nodes"`
 	CheckedAt  time.Time `json:"checked_at"`
+	// RAM/VRAM aggregates across READY/RUNNING nodes.  VRAM is always
+	// included (0 on CPU-only clusters is a real, meaningful value).
+	// ram_total_gb is populated from registry.Node.RAMGB (set at Join time).
+	RAMTotalGB  float64 `json:"ram_total_gb"`
+	VRAMTotalGB float64 `json:"vram_total_gb"`
 }
 
 // handleClusterHealth reports a coarse cluster health summary derived from the
-// registry: DB reachability plus node counts.
+// registry: DB reachability plus node counts and capacity aggregates.
 func (s *Server) handleClusterHealth(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	if err := s.reg.Ping(ctx); err != nil {
@@ -2816,10 +2821,13 @@ func (s *Server) handleClusterHealth(w http.ResponseWriter, r *http.Request) {
 		s.writeError(w, http.StatusInternalServerError, "health_failed", err.Error())
 		return
 	}
-	ready := 0
+	var ready int
+	var ramTotal, vramTotal float64
 	for _, n := range nodes {
 		if n.State == "NODE_STATE_READY" || n.State == "NODE_STATE_RUNNING" {
 			ready++
+			ramTotal += n.RAMGB
+			vramTotal += n.VRAMGB
 		}
 	}
 	status := "ok"
@@ -2829,10 +2837,12 @@ func (s *Server) handleClusterHealth(w http.ResponseWriter, r *http.Request) {
 		status = "degraded"
 	}
 	s.writeJSON(w, http.StatusOK, ClusterHealth{
-		Status:     status,
-		TotalNodes: len(nodes),
-		ReadyNodes: ready,
-		CheckedAt:  time.Now().UTC(),
+		Status:      status,
+		TotalNodes:  len(nodes),
+		ReadyNodes:  ready,
+		CheckedAt:   time.Now().UTC(),
+		RAMTotalGB:  ramTotal,
+		VRAMTotalGB: vramTotal,
 	})
 }
 
@@ -2967,9 +2977,10 @@ func (s *Server) handleJoinToken(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = s.reg.AppendAudit(r.Context(), &registry.AuditEntry{Actor: actorFromRequest(r), Action: "join_token.minted", Target: s.clusterID})
 	s.writeJSON(w, http.StatusCreated, map[string]any{
-		"token":      tok.Token,
-		"expires_at": tok.ExpiresAt.UTC().Format(time.RFC3339),
-		"cluster_id": s.clusterID,
+		"token":             tok.Token,
+		"expires_at":        tok.ExpiresAt.UTC().Format(time.RFC3339),
+		"cluster_id":        s.clusterID,
+		"control_plane_url": s.publicAddr,
 	})
 }
 
