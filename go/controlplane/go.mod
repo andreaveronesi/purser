@@ -7,7 +7,7 @@ require (
 	github.com/go-ldap/ldap/v3 v3.4.14
 	github.com/hashicorp/raft v1.7.3
 	github.com/hashicorp/raft-boltdb/v2 v2.3.1
-	github.com/jackc/pgx/v5 v5.10.0
+	github.com/jackc/pgx/v5 v5.11.0
 	github.com/jung-kurt/gofpdf v1.16.2
 	github.com/open-policy-agent/opa v1.20.2
 	github.com/prometheus/client_golang v1.24.1
