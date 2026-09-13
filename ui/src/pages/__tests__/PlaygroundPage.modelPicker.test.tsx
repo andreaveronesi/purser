@@ -16,8 +16,8 @@
  * (b) distinct models are all listed, in first-seen order, stable across render;
  * (c) a non-ACTIVE deployment's model is not listed;
  * (d) the Gateway's served list wins when present, and is de-duplicated too;
- * (e) empty case — no active deployments + Gateway unreachable => DEFAULT_MODEL
- *     is offered and the "no active deployment" notice is shown.
+ * (e) empty case — no active deployments + Gateway unreachable => disabled
+ *     placeholder shown (no phantom model), "no active deployment" notice shown.
  *
  * Assertions read the real `<select>` the operator sees (its `<option>`s).
  */
@@ -59,8 +59,7 @@ const mockUseGatewayModels = useGatewayModels as ReturnType<typeof vi.fn>;
 // Fixtures / helpers
 // ---------------------------------------------------------------------------
 
-/** Mirrors DEFAULT_MODEL in PlaygroundPage.tsx. */
-const DEFAULT_MODEL = 'qwen3-moe-235b';
+// DEFAULT_MODEL was removed in the phantom-model fix (E5).
 
 function deployment(id: string, modelId: string, state: DeploymentState = 'active'): Deployment {
   return {
@@ -216,13 +215,16 @@ describe('PlaygroundPage model picker', () => {
     expect(modelOptions(container)).toEqual(['served-a', 'served-b']);
   });
 
-  it('(e) falls back to DEFAULT_MODEL and shows the notice when nothing is available', () => {
+  it('(e) shows disabled placeholder (no phantom model) and notice when nothing is available', () => {
     mockGatewayUnreachable();
     mockDeployments([]);
 
     const { container } = renderPage();
 
-    expect(modelOptions(container)).toEqual([DEFAULT_MODEL]);
+    // Phantom 'qwen3-moe-235b' must not appear; only the empty placeholder option.
+    expect(modelOptions(container)).not.toContain('qwen3-moe-235b');
+    expect(modelOptions(container)).toEqual(['']);
+    // The "no active deployment" notice is still shown.
     expect(screen.getByRole('note')).toBeInTheDocument();
   });
 });

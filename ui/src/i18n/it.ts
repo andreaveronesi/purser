@@ -215,6 +215,7 @@ export const it: Record<StringKey, string> = {
   'playground.apikeyHint': 'Inviata come Authorization: Bearer al Gateway. Ignorata in modalità mock.',
   'playground.apikeyHelp': 'Ottieni la key in Impostazioni → Crea key (ruolo: inferenza). Demo key: demo-key-12345',
   'playground.error': 'Il Gateway non ha risposto. Verifica che un modello sia deployato e che la tua API key sia valida, poi riprova.',
+  'playground.noModels': 'Nessun modello disponibile',
 
   'jointoken.title': 'Aggiungi nodo',
   'jointoken.subtitle':

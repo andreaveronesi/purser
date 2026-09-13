@@ -15,7 +15,6 @@ import { useDeployments, useGatewayModels } from '../hooks/queries';
 import { useT } from '../i18n';
 import type { ChatMessage } from '../api/types';
 
-const DEFAULT_MODEL = 'qwen3-moe-235b';
 const SYSTEM_PROMPT = 'You are a helpful assistant running on a private Purser cluster.';
 const KEY_STORAGE = 'purser.gatewayKey';
 const DEMO_KEY = 'demo-key-12345';
@@ -50,7 +49,7 @@ export function PlaygroundPage() {
     return [...new Set(source)];
   }, [gatewayModels.data, deploymentModels]);
 
-  const [model, setModel] = useState(DEFAULT_MODEL);
+  const [model, setModel] = useState('');
   useEffect(() => {
     if (activeModels.length > 0 && !activeModels.includes(model)) setModel(activeModels[0]);
   }, [activeModels, model]);
@@ -75,7 +74,7 @@ export function PlaygroundPage() {
 
   const send = () => {
     const text = input.trim();
-    if (!text || streaming) return;
+    if (!text || streaming || activeModels.length === 0) return;
     const history: ChatMessage[] = [
       { role: 'system', content: SYSTEM_PROMPT },
       ...messages,
@@ -163,13 +162,20 @@ export function PlaygroundPage() {
               id={modelId}
               className="select"
               value={model}
+              disabled={activeModels.length === 0}
               onChange={(e) => setModel(e.target.value)}
             >
-              {(activeModels.length > 0 ? activeModels : [DEFAULT_MODEL]).map((m) => (
-                <option key={m} value={m}>
-                  {m}
+              {activeModels.length === 0 ? (
+                <option value="" disabled>
+                  {t('playground.noModels')}
                 </option>
-              ))}
+              ) : (
+                activeModels.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))
+              )}
             </select>
           </Field>
           <Field
@@ -225,6 +231,7 @@ export function PlaygroundPage() {
             rows={2}
             placeholder={t('playground.placeholder')}
             value={input}
+            disabled={activeModels.length === 0}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
@@ -238,7 +245,7 @@ export function PlaygroundPage() {
               {t('playground.stop')}
             </Button>
           ) : (
-            <Button variant="primary" type="submit" disabled={!input.trim()}>
+            <Button variant="primary" type="submit" disabled={!input.trim() || activeModels.length === 0}>
               {t('playground.send')}
             </Button>
           )}

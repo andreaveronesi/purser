@@ -226,6 +226,7 @@ export const en = {
   'playground.apikeyHint': 'Sent as Authorization: Bearer to the Gateway. Ignored in mock mode.',
   'playground.apikeyHelp': 'Get your key in Settings → Create key (role: inference). Demo key: demo-key-12345',
   'playground.error': 'The Gateway did not respond. Check a model is deployed and your API key is valid, then try again.',
+  'playground.noModels': 'No models available',
 
   // join token management
   'jointoken.title': 'Add Node',

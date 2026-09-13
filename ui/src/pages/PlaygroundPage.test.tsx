@@ -305,3 +305,97 @@ describe('PlaygroundPage', () => {
     expect(screen.getByText('playground.apikey')).toBeInTheDocument();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Phantom-model bug (E5): no models available → disabled/placeholder state
+// ---------------------------------------------------------------------------
+
+describe('PlaygroundPage — no models state', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    streamChatMock.mockReset();
+    // Both gateway and deployments empty → activeModels = []
+    mockUseDeployments.mockReturnValue({
+      data: [],
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useDeployments>);
+    mockUseGatewayModels.mockReturnValue({
+      data: [],
+      isLoading: false,
+      isError: false,
+      error: null,
+    } as unknown as ReturnType<typeof useGatewayModels>);
+  });
+
+  it('selector does NOT contain qwen3-moe-235b when no models available', () => {
+    renderPage();
+    const select = screen.getByRole('combobox', { name: /playground\.model/i });
+    const options = Array.from((select as HTMLSelectElement).options).map((o) => o.value);
+    expect(options).not.toContain('qwen3-moe-235b');
+  });
+
+  it('selector shows playground.noModels placeholder when no models available', () => {
+    renderPage();
+    expect(screen.getByText('playground.noModels')).toBeInTheDocument();
+  });
+
+  it('Send button is disabled when no models available', () => {
+    renderPage();
+    expect(screen.getByRole('button', { name: /playground\.send/i })).toBeDisabled();
+  });
+
+  it('textarea is disabled when no models available', () => {
+    renderPage();
+    expect(screen.getByRole('textbox')).toBeDisabled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// E5: with active model → normal usable state
+// ---------------------------------------------------------------------------
+
+describe('PlaygroundPage — with active model', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    streamChatMock.mockReset();
+    mockUseDeployments.mockReturnValue({
+      data: [activeDeployment],
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useDeployments>);
+    mockUseGatewayModels.mockReturnValue({
+      data: [{ id: 'tinyllama-1b' }],
+      isLoading: false,
+      isError: false,
+      error: null,
+    } as unknown as ReturnType<typeof useGatewayModels>);
+  });
+
+  it('selector contains the real model (tinyllama-1b)', () => {
+    renderPage();
+    const select = screen.getByRole('combobox', { name: /playground\.model/i });
+    const options = Array.from((select as HTMLSelectElement).options).map((o) => o.value);
+    expect(options).toContain('tinyllama-1b');
+  });
+
+  it('model state is initialized to the first real model, not the phantom', () => {
+    renderPage();
+    const select = screen.getByRole('combobox', { name: /playground\.model/i }) as HTMLSelectElement;
+    expect(select.value).toBe('tinyllama-1b');
+    expect(select.value).not.toBe('qwen3-moe-235b');
+  });
+
+  it('Send button is enabled after typing when model is available', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    const textarea = screen.getByRole('textbox');
+    expect(textarea).not.toBeDisabled();
+    await user.type(textarea, 'Hello');
+    expect(screen.getByRole('button', { name: /playground\.send/i })).not.toBeDisabled();
+  });
+});
