@@ -245,6 +245,7 @@ CREATE TABLE IF NOT EXISTS oidc_sessions (
     email               TEXT    NOT NULL DEFAULT '',
     idp_issuer          TEXT    NOT NULL DEFAULT '',
     auth_method         TEXT    NOT NULL DEFAULT 'oidc',  -- 'oidc' | 'ldap' | 'service_account'
+    role                TEXT    NOT NULL DEFAULT '',     -- resolved Purser role at login: 'admin'|'viewer'|'inference'|''
     created_at          TEXT    NOT NULL,
     expires_at          TEXT    NOT NULL,
     revoked             INTEGER NOT NULL DEFAULT 0,

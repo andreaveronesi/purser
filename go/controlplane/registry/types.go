@@ -408,6 +408,7 @@ type OIDCSession struct {
 	Email             string     `json:"email"`
 	IDPIssuer         string     `json:"idp_issuer"`
 	AuthMethod        string     `json:"auth_method"` // "oidc" | "ldap" | "service_account"
+	Role              string     `json:"role,omitempty"` // resolved Purser role at login: "admin" | "viewer" | "inference" | ""
 	CreatedAt         time.Time  `json:"created_at"`
 	ExpiresAt         time.Time  `json:"expires_at"`
 	Revoked           bool       `json:"revoked"`

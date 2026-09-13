@@ -915,26 +915,39 @@ func (s *Server) oidcMiddleware(next http.Handler) http.Handler {
 					// 5a. Check revocation in the distributed session store.
 					// This catches sessions revoked via backchannel logout or an
 					// admin force-logout on any other cluster node.
-					revoked := false
+					// We also read the session's Role here (Option B: resolved at
+					// login time and persisted in the DB row). This lets rbacMiddleware
+					// enforce OIDC-group-derived roles on the cookie path without an
+					// extra IdP call per request.
+					var sessionRole string
 					if s.reg != nil {
 						tokenHash := sha256HexOf(cookie.Value)
-						if _, dbErr := s.reg.GetOIDCSession(r.Context(), tokenHash); dbErr != nil {
+						sess, dbErr := s.reg.GetOIDCSession(r.Context(), tokenHash)
+						if dbErr != nil {
 							// Session not found or revoked in DB — treat as invalid.
 							s.log.Debug("OIDC session revoked or not in DB", "err", dbErr)
-							revoked = true
+							// fall through to the next credential check (section 6 → 401)
+							goto afterCookie
 						}
+						sessionRole = sess.Role
 					}
-					if !revoked {
-						ctx := context.WithValue(r.Context(), ctxKeyOIDCSub, sub)
-						ctx = context.WithValue(ctx, ctxKeyOIDCEmail, email)
-						next.ServeHTTP(w, r.WithContext(ctx))
-						return
+					ctx := context.WithValue(r.Context(), ctxKeyOIDCSub, sub)
+					ctx = context.WithValue(ctx, ctxKeyOIDCEmail, email)
+					// Inject the saved role so rbacMiddleware 2b can enforce it.
+					// If the session predates this feature (role == ""), ctxKeyOIDCRole
+					// is not set and rbacMiddleware falls through to the API-key path,
+					// which preserves the existing fail-closed behaviour.
+					if sessionRole != "" {
+						ctx = context.WithValue(ctx, ctxKeyOIDCRole, sessionRole)
 					}
+					next.ServeHTTP(w, r.WithContext(ctx))
+					return
 				} else {
 					s.log.Debug("OIDC session cookie invalid", "err", err)
 				}
 			}
 		}
+	afterCookie:
 		// 6. No valid credential. Redirect browser requests to /auth/login when
 		// the Authorization Code Flow is configured; return 401 JSON otherwise.
 		if strings.Contains(r.Header.Get("Accept"), "text/html") &&

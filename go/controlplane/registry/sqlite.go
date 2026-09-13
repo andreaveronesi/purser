@@ -113,6 +113,9 @@ func (r *SQLiteRegistry) Migrate(ctx context.Context) error {
 		{"nodes", "dataplane_id", "TEXT"},
 		// Service account description (v0.5). Team-scoped from v0.5 onwards.
 		{"service_accounts", "description", "TEXT NOT NULL DEFAULT ''"}, // comma required in Go slice literal
+		// Resolved Purser role saved at login time (v0.7). Default '' preserves
+		// existing sessions without a role (they fall through to the API-key path).
+		{"oidc_sessions", "role", "TEXT NOT NULL DEFAULT ''"},
 	} {
 		if err := r.ensureColumn(ctx, m.table, m.column, m.def); err != nil {
 			return fmt.Errorf("registry: migrate: %w", err)

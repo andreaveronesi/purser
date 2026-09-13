@@ -127,10 +127,10 @@ func fmtNullTimePtr(t *time.Time) any {
 func (r *SQLiteRegistry) CreateOIDCSession(ctx context.Context, s *OIDCSession) error {
 	_, err := r.db.ExecContext(ctx,
 		`INSERT OR REPLACE INTO oidc_sessions
-		 (token_hash, sub, email, idp_issuer, auth_method, created_at, expires_at,
+		 (token_hash, sub, email, idp_issuer, auth_method, role, created_at, expires_at,
 		  revoked, refresh_token_enc, access_token_expiry)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
-		s.TokenHash, s.Sub, s.Email, s.IDPIssuer, s.AuthMethod,
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
+		s.TokenHash, s.Sub, s.Email, s.IDPIssuer, s.AuthMethod, s.Role,
 		fmtTime(s.CreatedAt), fmtTime(s.ExpiresAt),
 		nullStr(s.RefreshTokenEnc),
 		fmtNullTimePtr(s.AccessTokenExpiry),
@@ -143,7 +143,7 @@ func (r *SQLiteRegistry) CreateOIDCSession(ctx context.Context, s *OIDCSession) 
 // has already expired.
 func (r *SQLiteRegistry) GetOIDCSession(ctx context.Context, tokenHash string) (*OIDCSession, error) {
 	row := r.db.QueryRowContext(ctx,
-		`SELECT token_hash, sub, email, idp_issuer, auth_method, created_at, expires_at,
+		`SELECT token_hash, sub, email, idp_issuer, auth_method, role, created_at, expires_at,
 		        revoked, revoked_at, refresh_token_enc, access_token_expiry
 		 FROM oidc_sessions
 		 WHERE token_hash=? AND revoked=0 AND expires_at > ?`,
@@ -152,9 +152,10 @@ func (r *SQLiteRegistry) GetOIDCSession(ctx context.Context, tokenHash string) (
 	var s OIDCSession
 	var createdAtStr, expiresAtStr string
 	var revokedInt int
+	var roleNS sql.NullString
 	var revokedAtNS, refreshEncNS, accessExpiryNS sql.NullString
 	err := row.Scan(
-		&s.TokenHash, &s.Sub, &s.Email, &s.IDPIssuer, &s.AuthMethod,
+		&s.TokenHash, &s.Sub, &s.Email, &s.IDPIssuer, &s.AuthMethod, &roleNS,
 		&createdAtStr, &expiresAtStr, &revokedInt, &revokedAtNS,
 		&refreshEncNS, &accessExpiryNS,
 	)
@@ -171,6 +172,9 @@ func (r *SQLiteRegistry) GetOIDCSession(ctx context.Context, tokenHash string) (
 		s.ExpiresAt = t
 	}
 	s.Revoked = revokedInt != 0
+	if roleNS.Valid {
+		s.Role = roleNS.String
+	}
 	if revokedAtNS.Valid && revokedAtNS.String != "" {
 		if t, e := time.Parse(tsLayout, revokedAtNS.String); e == nil {
 			s.RevokedAt = &t

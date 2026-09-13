@@ -89,7 +89,8 @@ func (s *Server) handleLDAPLogin(w http.ResponseWriter, r *http.Request) {
 	sessionToken := s.signSession(info.Email, info.Email)
 	tokenHash := sha256HexOf(sessionToken)
 
-	// Persist session in SQLite (auth_method='ldap').
+	// Persist session in SQLite (auth_method='ldap'). Save the resolved role so
+	// subsequent requests can re-inject it without re-authenticating to LDAP.
 	if s.reg != nil {
 		_ = s.reg.CreateOIDCSession(r.Context(), &registry.OIDCSession{
 			TokenHash:  tokenHash,
@@ -97,6 +98,7 @@ func (s *Server) handleLDAPLogin(w http.ResponseWriter, r *http.Request) {
 			Email:      info.Email,
 			IDPIssuer:  "ldap",
 			AuthMethod: "ldap",
+			Role:       info.Role,
 			CreatedAt:  time.Now(),
 			ExpiresAt:  time.Now().Add(sessionTTL),
 		})

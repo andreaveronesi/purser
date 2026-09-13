@@ -367,12 +367,36 @@ func (s *Server) handleAuthCallback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 5. Verify the returned ID token.
-	sub, email, err := s.oidcVerifier.VerifyToken(r.Context(), tokenResp.IDToken)
-	if err != nil {
-		s.log.Debug("OIDC callback: ID token verification failed", "err", err)
-		s.writeError(w, http.StatusUnauthorized, "invalid_id_token",
-			"ID token verification failed")
-		return
+	// Use VerifyClaims when the verifier supports it (GroupClaimsVerifier) so
+	// that group/role claims are available to resolve the Purser role at login
+	// time and persist it in the session DB. Fall back to VerifyToken for
+	// verifiers that only implement the basic interface.
+	var sub, email, sessionRole string
+	if gcv, ok := s.oidcVerifier.(GroupClaimsVerifier); ok {
+		claims, err := gcv.VerifyClaims(r.Context(), tokenResp.IDToken)
+		if err != nil {
+			s.log.Debug("OIDC callback: ID token verification failed", "err", err)
+			s.writeError(w, http.StatusUnauthorized, "invalid_id_token",
+				"ID token verification failed")
+			return
+		}
+		sub = claims.Sub
+		email = claims.Email
+		// Resolve the highest-privilege Purser role from group/role claims so it
+		// can be persisted in the session row and re-used on subsequent requests
+		// without a per-request IdP call (Option B: role saved in OIDCSession).
+		if len(s.oidcGroupMappings) > 0 {
+			sessionRole = s.resolveGroupRole(append(claims.Groups, claims.Roles...))
+		}
+	} else {
+		var err error
+		sub, email, err = s.oidcVerifier.VerifyToken(r.Context(), tokenResp.IDToken)
+		if err != nil {
+			s.log.Debug("OIDC callback: ID token verification failed", "err", err)
+			s.writeError(w, http.StatusUnauthorized, "invalid_id_token",
+				"ID token verification failed")
+			return
+		}
 	}
 
 	// 6. Mint and set the session cookie.
@@ -393,6 +417,8 @@ func (s *Server) handleAuthCallback(w http.ResponseWriter, r *http.Request) {
 
 	// 6b. Persist the session in SQLite so any cluster node can validate or
 	// revoke it (HA support: login on node-A, subsequent request on node-B).
+	// The resolved role is stored here so subsequent requests can re-inject it
+	// into the context without an extra IdP round-trip (cookie path RBAC fix).
 	if s.reg != nil {
 		tokenHash := sha256HexOf(sessionToken)
 		if err := s.reg.CreateOIDCSession(r.Context(), &registry.OIDCSession{
@@ -401,6 +427,7 @@ func (s *Server) handleAuthCallback(w http.ResponseWriter, r *http.Request) {
 			Email:      email,
 			IDPIssuer:  s.oidcConfig.Issuer,
 			AuthMethod: "oidc",
+			Role:       sessionRole,
 			CreatedAt:  time.Now(),
 			ExpiresAt:  time.Now().Add(sessionTTL),
 		}); err != nil {
@@ -410,7 +437,7 @@ func (s *Server) handleAuthCallback(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	s.log.Info("OIDC login complete", "sub", sub, "email", email)
+	s.log.Info("OIDC login complete", "sub", sub, "email", email, "role", sessionRole)
 
 	// 7. Redirect to the dashboard.
 	http.Redirect(w, r, "/", http.StatusFound)

@@ -68,13 +68,29 @@ func (s *Server) handleListUsers(w http.ResponseWriter, r *http.Request) {
 	s.writeJSON(w, http.StatusOK, map[string]any{"users": users})
 }
 
-// handleGetMe returns the current actor's identity along with their org and
-// team memberships. This is the "who am I?" endpoint that every client should
-// call at login.
+// handleGetMe returns the current caller's identity: actor string, email,
+// effective role, platform/org admin flags, and org+team memberships.
+// The UI AuthContext uses this endpoint as its source of truth at login.
 //
 // GET /api/v1/platform/users/me
 func (s *Server) handleGetMe(w http.ResponseWriter, r *http.Request) {
 	actor := actorFromRequest(r)
+
+	// Extract OIDC identity claims injected by oidcMiddleware. These are present
+	// for both session-cookie (browser SSO) and Bearer token (machine) paths.
+	email, _ := r.Context().Value(ctxKeyOIDCEmail).(string)
+	role, _ := r.Context().Value(ctxKeyOIDCRole).(string)
+
+	// Fallback: if no OIDC role, check for an API key role so that machine callers
+	// that use API keys also get a sensible role in /me.
+	if role == "" {
+		if key := apiKeyFromContext(r.Context()); key != nil {
+			role = key.Role
+		}
+	}
+
+	// is_platform_admin: true when the caller has "admin" credentials of any kind.
+	isPlatformAdmin := s.isAdminActor(r)
 
 	var orgMemberships []*registry.OrgMember
 	var teamMemberships []*registry.TeamMember
@@ -94,14 +110,25 @@ func (s *Server) handleGetMe(w http.ResponseWriter, r *http.Request) {
 		teamMemberships = []*registry.TeamMember{}
 	}
 
-	// Note: full user profile (name, email, avatar) requires OIDC/LDAP
-	// integration (Wave 3). For now we expose what we know: the stable
-	// actor string derived from the auth credential and the membership lists.
+	// is_org_admin: true when the caller has the "org_admin" role in any org.
+	isOrgAdmin := false
+	for _, m := range orgMemberships {
+		if m.Role == "org_admin" {
+			isOrgAdmin = true
+			break
+		}
+	}
+
 	s.writeJSON(w, http.StatusOK, map[string]any{
-		"actor":                 actor,
-		"orgs":                  orgMemberships,
-		"teams":                 teamMemberships,
-		"note":                  "full user profile requires OIDC/LDAP integration (Wave 3)",
+		"actor":             actor,
+		"email":             email,
+		"role":              role,
+		"is_platform_admin": isPlatformAdmin,
+		"is_org_admin":      isOrgAdmin,
+		"orgs":              orgMemberships,
+		"teams":             teamMemberships,
+		// service_accounts are team-level credentials for machine-to-machine auth
+		// (LiteLLM, CI/CD). Managed via POST /api/v1/platform/teams/{id}/service-accounts.
 		"service_accounts_note": "service_accounts are team-level credentials for machine-to-machine auth (LiteLLM, CI/CD)",
 	})
 }
