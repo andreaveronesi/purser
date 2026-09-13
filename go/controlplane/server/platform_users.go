@@ -30,14 +30,11 @@ import (
 // ---------------------------------------------------------------------------
 
 // handleListUsers returns a summary of all platform users, derived from the
-// org_members table. Requires admin role.
+// org_members table.
+// Auth: platform:users:invite enforced by routePermission in rbacMiddleware (Wave 3).
 //
 // GET /api/v1/platform/users
 func (s *Server) handleListUsers(w http.ResponseWriter, r *http.Request) {
-	if !s.isAdminActor(r) {
-		s.writeError(w, http.StatusForbidden, "forbidden", "platform_admin role required")
-		return
-	}
 	if s.reg == nil {
 		s.writeJSON(w, http.StatusOK, map[string]any{"users": []any{}})
 		return
@@ -174,15 +171,11 @@ func (s *Server) handleGetUser(w http.ResponseWriter, r *http.Request) {
 // ---------------------------------------------------------------------------
 
 // handleCreateRole creates a new custom role within an org.
-// Requires org_admin or platform admin role.
+// Auth: org:roles:create enforced by routePermission in rbacMiddleware (Wave 3).
 //
 // POST /api/v1/platform/orgs/{orgId}/roles
 func (s *Server) handleCreateRole(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("orgId")
-	if !s.isAdminActor(r) {
-		s.writeError(w, http.StatusForbidden, "forbidden", "org_admin or platform_admin role required")
-		return
-	}
 	if s.reg == nil {
 		s.writeError(w, http.StatusInternalServerError, "no_registry", "registry not configured")
 		return
@@ -283,15 +276,12 @@ func (s *Server) handleGetRole(w http.ResponseWriter, r *http.Request) {
 
 // handleUpdateRole replaces the mutable fields of a custom role. System roles
 // (is_system=true) cannot be modified.
+// Auth: org:roles:create enforced by routePermission in rbacMiddleware (Wave 3).
 //
 // PUT /api/v1/platform/orgs/{orgId}/roles/{id}
 func (s *Server) handleUpdateRole(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("orgId")
 	roleID := r.PathValue("id")
-	if !s.isAdminActor(r) {
-		s.writeError(w, http.StatusForbidden, "forbidden", "org_admin or platform_admin role required")
-		return
-	}
 	if s.reg == nil {
 		s.writeError(w, http.StatusInternalServerError, "no_registry", "registry not configured")
 		return
@@ -359,15 +349,12 @@ func (s *Server) handleUpdateRole(w http.ResponseWriter, r *http.Request) {
 
 // handleDeleteRole removes a custom role. Returns 409 when the role is a
 // system role or is currently assigned to at least one team member.
+// Auth: org:roles:delete enforced by routePermission in rbacMiddleware (Wave 3).
 //
 // DELETE /api/v1/platform/orgs/{orgId}/roles/{id}
 func (s *Server) handleDeleteRole(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("orgId")
 	roleID := r.PathValue("id")
-	if !s.isAdminActor(r) {
-		s.writeError(w, http.StatusForbidden, "forbidden", "org_admin or platform_admin role required")
-		return
-	}
 	if s.reg == nil {
 		s.writeError(w, http.StatusInternalServerError, "no_registry", "registry not configured")
 		return

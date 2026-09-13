@@ -183,34 +183,67 @@ catalog are a single source of truth (see the
 role built from the catalog therefore grants exactly the access these routes
 require.
 
-| HTTP Method | Path | Required permission |
-|---|---|---|
-| `GET`    | `/api/v1/nodes`                                  | `team:metrics:view`     |
-| `POST`   | `/api/v1/nodes/{id}/drain`                       | `team:models:deploy`    |
-| `DELETE` | `/api/v1/nodes/{id}`                             | `org:pools:request`     |
-| `GET`    | `/api/v1/models`                                 | `team:metrics:view`     |
-| `POST`   | `/api/v1/models`                                 | `team:models:deploy`    |
-| `DELETE` | `/api/v1/models/{id}`                            | `team:models:undeploy`  |
-| `POST`   | `/api/v1/models/{id}/deploy`                     | `team:models:deploy`    |
-| `GET`    | `/api/v1/deployments`                            | `team:metrics:view`     |
-| `DELETE` | `/api/v1/deployments/{id}`                       | `team:models:undeploy`  |
-| `GET`    | `/api/v1/apikeys`                                | `team:metrics:view`     |
-| `POST`   | `/api/v1/apikeys`                                | `team:keys:create`      |
-| `DELETE` | `/api/v1/apikeys/{id}`                           | `team:keys:revoke`      |
-| `POST`   | `/api/v1/apikeys/{id}/rotate`                    | `team:keys:create`      |
-| `GET`    | `/api/v1/enterprise/audit-log`                   | `team:metrics:view`     |
-| `GET`    | `/api/v1/inference-audit`                        | `team:metrics:view`     |
-| `GET`    | `/api/v1/approvals`                              | `team:approvals:view`   |
-| `POST`   | `/api/v1/approvals/{deploymentId}/approve`       | `team:approvals:review` |
-| `POST`   | `/api/v1/approvals/{deploymentId}/reject`        | `team:approvals:review` |
-| `GET`    | `/api/v1/policies`                               | `team:metrics:view`     |
-| `PUT`    | `/api/v1/policies/{name}`                        | `org:roles:create`      |
-| `DELETE` | `/api/v1/policies/{name}`                        | `org:roles:delete`      |
-| `POST`   | `/api/v1/config/apply`                           | `team:models:deploy`    |
-| `POST`   | `/api/v1/config/diff`                            | `team:metrics:view`     |
-| `POST`   | `/api/v1/platform/orgs`                          | `platform:orgs:create`  |
-| `DELETE` | `/api/v1/platform/orgs/{id}`                     | `platform:orgs:delete`  |
-| `POST`   | `/api/v1/platform/pools`                         | `platform:pools:manage` |
+| HTTP Method | Path | Required permission | Notes |
+|---|---|---|---|
+| `GET`    | `/api/v1/nodes`                                         | `team:metrics:view`       | |
+| `POST`   | `/api/v1/nodes/{id}/drain`                              | `team:models:deploy`      | |
+| `DELETE` | `/api/v1/nodes/{id}`                                    | `org:pools:request`       | |
+| `GET`    | `/api/v1/models`                                        | `team:metrics:view`       | |
+| `POST`   | `/api/v1/models`                                        | `team:models:deploy`      | |
+| `DELETE` | `/api/v1/models/{id}`                                   | `team:models:undeploy`    | |
+| `POST`   | `/api/v1/models/{id}/deploy`                            | `team:models:deploy`      | |
+| `GET`    | `/api/v1/deployments`                                   | `team:metrics:view`       | |
+| `DELETE` | `/api/v1/deployments/{id}`                              | `team:models:undeploy`    | |
+| `GET`    | `/api/v1/apikeys`                                       | `team:metrics:view`       | |
+| `POST`   | `/api/v1/apikeys`                                       | `team:keys:create`        | |
+| `DELETE` | `/api/v1/apikeys/{id}`                                  | `team:keys:revoke`        | |
+| `POST`   | `/api/v1/apikeys/{id}/rotate`                           | `team:keys:create`        | |
+| `GET`    | `/api/v1/enterprise/audit-log`                          | `team:metrics:view`       | |
+| `GET`    | `/api/v1/inference-audit`                               | `team:metrics:view`       | |
+| `GET`    | `/api/v1/approvals`                                     | `team:approvals:view`     | |
+| `POST`   | `/api/v1/approvals/{deploymentId}/approve`              | `team:approvals:review`   | |
+| `POST`   | `/api/v1/approvals/{deploymentId}/reject`               | `team:approvals:review`   | |
+| `GET`    | `/api/v1/policies`                                      | `team:metrics:view`       | |
+| `PUT`    | `/api/v1/policies/{name}`                               | `org:roles:create`        | |
+| `DELETE` | `/api/v1/policies/{name}`                               | `org:roles:delete`        | |
+| `POST`   | `/api/v1/config/apply`                                  | `team:models:deploy`      | |
+| `POST`   | `/api/v1/config/diff`                                   | `team:metrics:view`       | |
+| `POST`   | `/api/v1/platform/orgs`                                 | `platform:orgs:create`    | |
+| `DELETE` | `/api/v1/platform/orgs/{id}`                            | `platform:orgs:delete`    | |
+| `POST`   | `/api/v1/platform/pools`                                | `platform:pools:manage`   | |
+| **Wave 3 additions** | | | |
+| `POST`   | `/api/v1/platform/orgs/{orgId}/teams`                   | `org:teams:create`        | org_admin+ |
+| `PUT`    | `/api/v1/platform/orgs/{id}`                            | `org:teams:create`        | org_admin proxy; no dedicated org:update perm |
+| `DELETE` | `/api/v1/platform/teams/{id}`                           | `org:teams:delete`        | org_admin+ |
+| `PUT`    | `/api/v1/platform/teams/{id}`                           | `org:teams:create`        | org_admin proxy |
+| `POST`   | `/api/v1/platform/orgs/{orgId}/members`                 | `org:members:invite`      | org_admin+ |
+| `PUT`    | `/api/v1/platform/orgs/{orgId}/members/{userId}`        | `org:members:invite`      | org_admin+ |
+| `DELETE` | `/api/v1/platform/orgs/{orgId}/members/{userId}`        | `org:members:remove`      | org_admin+ |
+| `POST`   | `/api/v1/platform/teams/{teamId}/members`               | `team:members:invite`     | team_admin+ |
+| `PUT`    | `/api/v1/platform/teams/{teamId}/members/{userId}`      | `team:members:invite`     | team_admin+ |
+| `DELETE` | `/api/v1/platform/teams/{teamId}/members/{userId}`      | `team:members:remove`     | team_admin+ |
+| `POST`   | `/api/v1/platform/orgs/{orgId}/roles`                   | `org:roles:create`        | org_admin+ |
+| `PUT`    | `/api/v1/platform/orgs/{orgId}/roles/{id}`              | `org:roles:create`        | org_admin+ |
+| `DELETE` | `/api/v1/platform/orgs/{orgId}/roles/{id}`              | `org:roles:delete`        | org_admin+ |
+| `GET`    | `/api/v1/platform/orgs/{orgId}/roles`                   | `team:metrics:view`       | any authenticated member |
+| `GET`    | `/api/v1/platform/orgs/{orgId}/roles/{id}`              | `team:metrics:view`       | any authenticated member |
+| `GET`    | `/api/v1/platform/users`                                | `platform:users:invite`   | proxy for platform-admin user list; see gap note |
+| `GET`    | `/api/v1/billing/report`                                | `team:metrics:view`       | |
+| `GET`    | `/api/v1/billing/summary`                               | `team:metrics:view`       | |
+| `GET`    | `/api/v1/billing/forecast`                              | `team:metrics:view`       | |
+| `GET`    | `/api/v1/billing/models/adoption`                       | `team:metrics:view`       | |
+| `GET`    | `/api/v1/platform/orgs/{orgId}/billing`                 | `org:members:invite`      | org-scope billing; see gap note |
+| `GET`    | `/api/v1/platform/teams/{teamId}/billing`               | `team:metrics:view`       | |
+| `POST`   | `/api/v1/gdpr/erasure`                                  | `platform:orgs:delete`    | proxy for platform-admin GDPR; see gap note |
+| `GET`    | `/api/v1/gdpr/erasure-log`                              | `platform:orgs:delete`    | proxy for platform-admin GDPR; see gap note |
+| `GET`    | `/api/v1/slo/compliance`                                | `team:metrics:view`       | |
+
+> **Permission-catalog gaps (v0.7):** A few routes currently use a proxy permission
+> from the 22-perm catalog because the ideal permission string is missing.
+> The following additions are planned for v0.8:
+> - `platform:users:view` — granular read access to the user list (currently proxied to `platform:users:invite`).
+> - `org:billing:view` — read org-level billing data without full org membership control (currently proxied to `org:members:invite`).
+> - `platform:gdpr:manage` — dedicated GDPR operation permission (currently proxied to `platform:orgs:delete`).
 
 ### Legacy role → effective permissions
 

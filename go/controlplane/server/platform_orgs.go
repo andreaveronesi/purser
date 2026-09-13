@@ -148,13 +148,10 @@ func (s *Server) handleGetOrg(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleUpdateOrg updates an organization's name and/or description.
+// Auth: org:teams:create (org-admin proxy) enforced by routePermission (Wave 3).
 // PUT /api/v1/platform/orgs/{id} — org_admin or platform_admin.
 func (s *Server) handleUpdateOrg(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	if !s.isOrgAdminOrPlatformAdmin(r, id) {
-		s.writeError(w, http.StatusForbidden, "forbidden", "org_admin or platform_admin role required")
-		return
-	}
 
 	org, err := s.reg.GetOrganization(r.Context(), id)
 	if errors.Is(err, registry.ErrNotFound) {
@@ -239,13 +236,10 @@ func (s *Server) handleDeleteOrg(w http.ResponseWriter, r *http.Request) {
 // ---------------------------------------------------------------------------
 
 // handleCreateTeam creates a team within an organization.
+// Auth: org:teams:create enforced by routePermission in rbacMiddleware (Wave 3).
 // POST /api/v1/platform/orgs/{orgId}/teams — org_admin or platform_admin.
 func (s *Server) handleCreateTeam(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("orgId")
-	if !s.isOrgAdminOrPlatformAdmin(r, orgID) {
-		s.writeError(w, http.StatusForbidden, "forbidden", "org_admin or platform_admin role required")
-		return
-	}
 
 	// Verify org exists.
 	if _, err := s.reg.GetOrganization(r.Context(), orgID); err != nil {
@@ -330,7 +324,8 @@ func (s *Server) handleGetTeam(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleUpdateTeam updates a team's name and/or description.
-// PUT /api/v1/platform/teams/{id} — team_admin, org_admin, or platform_admin.
+// Auth: org:teams:create (org-admin proxy) enforced by routePermission (Wave 3).
+// PUT /api/v1/platform/teams/{id} — org_admin or platform_admin.
 func (s *Server) handleUpdateTeam(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 
@@ -341,11 +336,6 @@ func (s *Server) handleUpdateTeam(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		s.writeError(w, http.StatusInternalServerError, "get_team_failed", err.Error())
-		return
-	}
-
-	if !s.isOrgAdminOrPlatformAdmin(r, team.OrgID) {
-		s.writeError(w, http.StatusForbidden, "forbidden", "org_admin or platform_admin role required")
 		return
 	}
 
@@ -382,6 +372,7 @@ func (s *Server) handleUpdateTeam(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleDeleteTeam deletes a team.
+// Auth: org:teams:delete enforced by routePermission in rbacMiddleware (Wave 3).
 // DELETE /api/v1/platform/teams/{id} — org_admin or platform_admin.
 func (s *Server) handleDeleteTeam(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
@@ -395,11 +386,7 @@ func (s *Server) handleDeleteTeam(w http.ResponseWriter, r *http.Request) {
 		s.writeError(w, http.StatusInternalServerError, "get_team_failed", err.Error())
 		return
 	}
-
-	if !s.isOrgAdminOrPlatformAdmin(r, team.OrgID) {
-		s.writeError(w, http.StatusForbidden, "forbidden", "org_admin or platform_admin role required")
-		return
-	}
+	_ = team // team.OrgID resolved for audit; org-scope enforced by routePermission
 
 	if err := s.reg.DeleteTeam(r.Context(), id); err != nil {
 		if errors.Is(err, registry.ErrNotFound) {
@@ -422,12 +409,10 @@ func (s *Server) handleDeleteTeam(w http.ResponseWriter, r *http.Request) {
 // ---------------------------------------------------------------------------
 
 // handleAddOrgMember adds a user to an organization.
-// POST /api/v1/platform/orgs/{orgId}/members — platform_admin (Wave 3: org_admin).
+// Auth: org:members:invite enforced by routePermission in rbacMiddleware (Wave 3).
+// POST /api/v1/platform/orgs/{orgId}/members — org_admin or platform_admin.
 func (s *Server) handleAddOrgMember(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("orgId")
-	if !s.requirePlatformAdmin(w, r) {
-		return
-	}
 
 	var req struct {
 		UserID string `json:"user_id"`
@@ -471,13 +456,11 @@ func (s *Server) handleListOrgMembers(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleUpdateOrgMember changes the role of an existing org member.
-// PUT /api/v1/platform/orgs/{orgId}/members/{userId} — platform_admin.
+// Auth: org:members:invite enforced by routePermission in rbacMiddleware (Wave 3).
+// PUT /api/v1/platform/orgs/{orgId}/members/{userId} — org_admin or platform_admin.
 func (s *Server) handleUpdateOrgMember(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("orgId")
 	userID := r.PathValue("userId")
-	if !s.requirePlatformAdmin(w, r) {
-		return
-	}
 
 	var req struct {
 		Role string `json:"role"`
@@ -520,13 +503,11 @@ func (s *Server) handleUpdateOrgMember(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleRemoveOrgMember removes a user from an organization.
-// DELETE /api/v1/platform/orgs/{orgId}/members/{userId} — platform_admin.
+// Auth: org:members:remove enforced by routePermission in rbacMiddleware (Wave 3).
+// DELETE /api/v1/platform/orgs/{orgId}/members/{userId} — org_admin or platform_admin.
 func (s *Server) handleRemoveOrgMember(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("orgId")
 	userID := r.PathValue("userId")
-	if !s.requirePlatformAdmin(w, r) {
-		return
-	}
 
 	if err := s.reg.RemoveOrgMember(r.Context(), orgID, userID); err != nil {
 		if errors.Is(err, registry.ErrNotFound) {
@@ -544,12 +525,10 @@ func (s *Server) handleRemoveOrgMember(w http.ResponseWriter, r *http.Request) {
 // ---------------------------------------------------------------------------
 
 // handleAddTeamMember adds a user to a team.
-// POST /api/v1/platform/teams/{teamId}/members — platform_admin (Wave 3: team_admin, org_admin).
+// Auth: team:members:invite enforced by routePermission in rbacMiddleware (Wave 3).
+// POST /api/v1/platform/teams/{teamId}/members — team_admin, org_admin, or platform_admin.
 func (s *Server) handleAddTeamMember(w http.ResponseWriter, r *http.Request) {
 	teamID := r.PathValue("teamId")
-	if !s.requirePlatformAdmin(w, r) {
-		return
-	}
 
 	var req struct {
 		UserID string `json:"user_id"`
@@ -593,13 +572,11 @@ func (s *Server) handleListTeamMembers(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleUpdateTeamMember changes the role_id of a team member.
-// PUT /api/v1/platform/teams/{teamId}/members/{userId} — platform_admin.
+// Auth: team:members:invite enforced by routePermission in rbacMiddleware (Wave 3).
+// PUT /api/v1/platform/teams/{teamId}/members/{userId} — team_admin, org_admin, or platform_admin.
 func (s *Server) handleUpdateTeamMember(w http.ResponseWriter, r *http.Request) {
 	teamID := r.PathValue("teamId")
 	userID := r.PathValue("userId")
-	if !s.requirePlatformAdmin(w, r) {
-		return
-	}
 
 	var req struct {
 		RoleID string `json:"role_id"`
@@ -637,13 +614,11 @@ func (s *Server) handleUpdateTeamMember(w http.ResponseWriter, r *http.Request) 
 }
 
 // handleRemoveTeamMember removes a user from a team.
-// DELETE /api/v1/platform/teams/{teamId}/members/{userId} — platform_admin.
+// Auth: team:members:remove enforced by routePermission in rbacMiddleware (Wave 3).
+// DELETE /api/v1/platform/teams/{teamId}/members/{userId} — team_admin, org_admin, or platform_admin.
 func (s *Server) handleRemoveTeamMember(w http.ResponseWriter, r *http.Request) {
 	teamID := r.PathValue("teamId")
 	userID := r.PathValue("userId")
-	if !s.requirePlatformAdmin(w, r) {
-		return
-	}
 
 	if err := s.reg.RemoveTeamMember(r.Context(), teamID, userID); err != nil {
 		if errors.Is(err, registry.ErrNotFound) {
