@@ -97,13 +97,13 @@ function UsageTable({ rows }: { rows: BillingTenantUsage[] }) {
         </thead>
         <tbody>
           {rows.map((row, i) => (
-            <tr key={`${row.tenant_id}-${row.model_id}-${i}`}>
-              <td>{row.tenant_id}</td>
-              <td>{row.model_id}</td>
-              <td>{fmtNum(row.request_count)}</td>
-              <td>{fmtNum(row.prompt_tokens)}</td>
-              <td>{fmtNum(row.completion_tokens)}</td>
-              <td>{row.avg_latency_ms.toFixed(1)} ms</td>
+            <tr key={`${row.tenantId}-${row.modelId}-${i}`}>
+              <td>{row.tenantId}</td>
+              <td>{row.modelId}</td>
+              <td>{fmtNum(row.requestCount)}</td>
+              <td>{fmtNum(row.promptTokens)}</td>
+              <td>{fmtNum(row.completionTokens)}</td>
+              <td>{row.avgLatencyMs.toFixed(1)} ms</td>
             </tr>
           ))}
         </tbody>
@@ -117,8 +117,8 @@ function UsageTable({ rows }: { rows: BillingTenantUsage[] }) {
 // ---------------------------------------------------------------------------
 
 function forecastTone(entry: BillingForecastEntry): Tone {
-  if (entry.days_until_exhaustion !== null && entry.days_until_exhaustion < 7) return 'danger';
-  if (entry.budget_monthly_usd > 0 && entry.projected_monthly_usd > entry.budget_monthly_usd * 0.8) return 'warning';
+  if (entry.daysUntilExhaustion !== null && entry.daysUntilExhaustion < 7) return 'danger';
+  if (entry.budgetMonthlyUsd > 0 && entry.projectedMonthlyUsd > entry.budgetMonthlyUsd * 0.8) return 'warning';
   return 'success';
 }
 
@@ -158,17 +158,17 @@ function ForecastCard() {
               {data.entries.map((entry, i) => {
                 const tone = forecastTone(entry);
                 return (
-                  <tr key={`${entry.org_id}-${entry.team_id}-${i}`}>
-                    <td>{entry.team_id || entry.org_id}</td>
-                    <td>${entry.burn_rate_daily_usd.toFixed(2)}</td>
+                  <tr key={`${entry.orgId}-${entry.teamId}-${i}`}>
+                    <td>{entry.teamId || entry.orgId}</td>
+                    <td>${entry.burnRateDailyUsd.toFixed(2)}</td>
                     <td>
                       <Badge tone={tone}>
-                        ${entry.projected_monthly_usd.toFixed(2)}
+                        ${entry.projectedMonthlyUsd.toFixed(2)}
                       </Badge>
                     </td>
                     <td>
-                      {entry.days_until_exhaustion !== null
-                        ? <Badge tone={tone}>{entry.days_until_exhaustion}</Badge>
+                      {entry.daysUntilExhaustion !== null
+                        ? <Badge tone={tone}>{entry.daysUntilExhaustion}</Badge>
                         : <span className="muted">∞</span>}
                     </td>
                   </tr>
@@ -206,10 +206,10 @@ function Sparkline({ values }: { values: number[] }) {
 
 function AdoptionRow({ series }: { series: ModelAdoptionSeries }) {
   const totalRequests = series.buckets.reduce((s, b) => s + b.requests, 0);
-  const totalTokens = series.buckets.reduce((s, b) => s + b.tokens_out, 0);
+  const totalTokens = series.buckets.reduce((s, b) => s + b.tokensOut, 0);
   return (
     <tr>
-      <td><code className="inline-code" style={{ fontSize: '0.85em' }}>{series.model_id}</code></td>
+      <td><code className="inline-code" style={{ fontSize: '0.85em' }}>{series.modelId}</code></td>
       <td>{fmtNum(totalRequests)}</td>
       <td>{fmtNum(totalTokens)}</td>
       <td><Sparkline values={series.buckets.map((b) => b.requests)} /></td>
@@ -262,7 +262,7 @@ function ModelAdoptionPanel() {
             </thead>
             <tbody>
               {data.series.map((s) => (
-                <AdoptionRow key={s.model_id} series={s} />
+                <AdoptionRow key={s.modelId} series={s} />
               ))}
             </tbody>
           </table>
@@ -292,7 +292,7 @@ function SlaCompliancePanel({ days }: { days: number }) {
     return <EmptyState message={t('chargeback.enterprise.required')} />;
   }
 
-  const stats: TenantSLAStat[] = data?.sla_stats ?? [];
+  const stats: TenantSLAStat[] = data?.slaStats ?? [];
 
   const actions = (
     <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '13px' }}>
@@ -334,14 +334,14 @@ function SlaCompliancePanel({ days }: { days: number }) {
             </thead>
             <tbody>
               {stats.map((s, i) => (
-                <tr key={`${s.tenant_id}-${i}`}>
-                  <td>{s.tenant_id}</td>
+                <tr key={`${s.tenantId}-${i}`}>
+                  <td>{s.tenantId}</td>
                   <td>
-                    <Badge tone={slaTone(s.sla_compliance_rate)}>
-                      {(s.sla_compliance_rate * 100).toFixed(1)}%
+                    <Badge tone={slaTone(s.slaComplianceRate)}>
+                      {(s.slaComplianceRate * 100).toFixed(1)}%
                     </Badge>
                   </td>
-                  <td>{fmtNum(s.sla_threshold_ms)} ms</td>
+                  <td>{fmtNum(s.slaThresholdMs)} ms</td>
                 </tr>
               ))}
             </tbody>
@@ -363,10 +363,10 @@ function StatRow({ report }: { report: OrgBillingReport | TeamBillingReport }) {
     <Card>
       <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap', padding: '0.5rem 0' }}>
         {!isOrg && (
-          <StatTile label={t('chargeback.tenants.stat.requests')} value={fmtNum((report as TeamBillingReport).total_requests)} />
+          <StatTile label={t('chargeback.tenants.stat.requests')} value={fmtNum((report as TeamBillingReport).totalRequests)} />
         )}
-        <StatTile label={t('chargeback.tenants.stat.tokens')} value={fmtNum(report.total_tokens)} />
-        <StatTile label={t('chargeback.tenants.stat.cost')} value={`$${report.total_cost_usd.toFixed(2)}`} />
+        <StatTile label={t('chargeback.tenants.stat.tokens')} value={fmtNum(report.totalTokens)} />
+        <StatTile label={t('chargeback.tenants.stat.cost')} value={`$${report.totalCostUsd.toFixed(2)}`} />
         {isOrg && (
           <StatTile label={t('chargeback.tenants.stat.teams')} value={(report as OrgBillingReport).teams.length} />
         )}
@@ -377,7 +377,7 @@ function StatRow({ report }: { report: OrgBillingReport | TeamBillingReport }) {
 
 function TeamBillingTable({ report }: { report: TeamBillingReport }) {
   const t = useT();
-  const rows = report.by_model ?? [];
+  const rows = report.byModel ?? [];
   if (rows.length === 0) return <EmptyState message={t('chargeback.tenants.empty')} />;
   return (
     <div className="table-wrap" style={{ overflowX: 'auto' }}>
@@ -391,10 +391,10 @@ function TeamBillingTable({ report }: { report: TeamBillingReport }) {
         </thead>
         <tbody>
           {rows.map((row, i) => (
-            <tr key={`${row.model_id}-${i}`}>
-              <td>{row.model_id}</td>
-              <td>{fmtNum(row.request_count)}</td>
-              <td>{fmtNum(row.total_tokens)}</td>
+            <tr key={`${row.modelId}-${i}`}>
+              <td>{row.modelId}</td>
+              <td>{fmtNum(row.requestCount)}</td>
+              <td>{fmtNum(row.totalTokens)}</td>
             </tr>
           ))}
         </tbody>
@@ -419,11 +419,11 @@ function OrgBillingTable({ report }: { report: OrgBillingReport }) {
         </thead>
         <tbody>
           {report.teams.map((tm, i) => (
-            <tr key={`${tm.team_id}-${i}`}>
-              <td>{tm.team_name || tm.team_id}</td>
-              <td>{fmtNum(tm.total_requests)}</td>
-              <td>{fmtNum(tm.total_tokens)}</td>
-              <td>${tm.total_cost_usd.toFixed(2)}</td>
+            <tr key={`${tm.teamId}-${i}`}>
+              <td>{tm.teamName || tm.teamId}</td>
+              <td>{fmtNum(tm.totalRequests)}</td>
+              <td>{fmtNum(tm.totalTokens)}</td>
+              <td>${tm.totalCostUsd.toFixed(2)}</td>
             </tr>
           ))}
         </tbody>
@@ -648,11 +648,11 @@ export function ChargebackPage() {
             <div style={{ marginBottom: '1rem' }}>
               <Card>
                 <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap', padding: '0.5rem 0' }}>
-                  <StatTile label={t('chargeback.stat.totalRequests')} value={fmtNum(report.total_requests)} />
-                  <StatTile label={t('chargeback.stat.totalTokens')} value={fmtNum(report.total_tokens)} />
+                  <StatTile label={t('chargeback.stat.totalRequests')} value={fmtNum(report.totalRequests)} />
+                  <StatTile label={t('chargeback.stat.totalTokens')} value={fmtNum(report.totalTokens)} />
                   <StatTile
                     label={t('chargeback.stat.activeTenants')}
-                    value={new Set(report.tenants.map((tu) => tu.tenant_id)).size}
+                    value={new Set(report.tenants.map((tu) => tu.tenantId)).size}
                   />
                 </div>
               </Card>

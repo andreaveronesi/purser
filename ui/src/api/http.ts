@@ -732,6 +732,9 @@ const enc = encodeURIComponent;
 
 function normalizeApproval(raw: unknown): DeploymentApproval {
   const a = (raw ?? {}) as Record<string, unknown>;
+  // quorum is present on GET /approvals/{id} (detail fetch); absent on list responses.
+  // camelizeKeys has already converted required_approvals → requiredApprovals etc.
+  const rawQuorum = a.quorum as Record<string, unknown> | undefined;
   return {
     id: typeof a.id === 'number' ? a.id : 0,
     deploymentId: str(a.deploymentId),
@@ -742,6 +745,13 @@ function normalizeApproval(raw: unknown): DeploymentApproval {
     reviewer: a.reviewer ? str(a.reviewer) : undefined,
     reviewedAt: a.reviewedAt ? str(a.reviewedAt) : undefined,
     notes: a.notes ? str(a.notes) : undefined,
+    quorum: rawQuorum
+      ? {
+          required: num(rawQuorum.required),
+          received: num(rawQuorum.received),
+          remaining: num(rawQuorum.remaining),
+        }
+      : undefined,
   };
 }
 
@@ -1097,7 +1107,7 @@ export function createHttpApi(baseUrl: string): PurserApi {
       request<void>(`/platform/pools/${enc(id)}`, { method: 'DELETE' }),
 
     listPoolNodes: (poolId) =>
-      request<{ node_ids: string[] }>(`/platform/pools/${enc(poolId)}/nodes`),
+      request<{ nodeIds: string[] }>(`/platform/pools/${enc(poolId)}/nodes`),
 
     assignNodeToPool: (poolId, nodeId) =>
       request<void>(`/platform/pools/${enc(poolId)}/nodes/${enc(nodeId)}`, { method: 'PUT' }),

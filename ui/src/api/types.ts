@@ -622,8 +622,8 @@ export interface ApprovalQuorumStatus {
   approvers?: Array<{
     /** SHA-256 hash of the reviewer's API key token. */
     actor: string;
-    /** When this reviewer approved. */
-    approved_at: string; // ISO8601
+    /** When this reviewer approved. camelizeKeys converts approved_at → approvedAt. */
+    approvedAt: string; // ISO8601
   }>;
 }
 
@@ -659,58 +659,62 @@ export interface DeploymentApprovalsResponse {
 // GET /api/v1/billing/summary is not gated and used by the Settings-page stats.
 // ---------------------------------------------------------------------------
 
-/** Aggregate inference activity for one tenant+model pair in a billing window. */
+/**
+ * Aggregate inference activity for one tenant+model pair in a billing window.
+ * camelizeKeys maps the wire's snake_case fields (tenant_id, model_id, …)
+ * onto these camelCase names.
+ */
 export interface BillingTenantUsage {
-  tenant_id: string;
-  model_id: string;
-  request_count: number;
-  prompt_tokens: number;
-  completion_tokens: number;
-  total_tokens: number;
-  avg_latency_ms: number;
-  period_start: string; // ISO-8601
-  period_end: string;   // ISO-8601
+  tenantId: string;
+  modelId: string;
+  requestCount: number;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  avgLatencyMs: number;
+  periodStart: string; // ISO-8601
+  periodEnd: string;   // ISO-8601
 }
 
 /**
  * SLA compliance rate for one tenant over the billing window. Present in a
  * BillingReport only when the caller passes a `sla_threshold_ms` query param;
- * `sla_compliance_rate` is the fraction (0.0–1.0) of the tenant's requests
+ * `slaComplianceRate` is the fraction (0.0–1.0) of the tenant's requests
  * whose latency was below the requested threshold.
  */
 export interface TenantSLAStat {
-  tenant_id: string;
-  sla_compliance_rate: number; // 0.0–1.0
-  sla_threshold_ms: number;
+  tenantId: string;
+  slaComplianceRate: number; // 0.0–1.0
+  slaThresholdMs: number;
 }
 
 /** Full chargeback report for a configurable time window. */
 export interface BillingReport {
-  period_start: string;  // ISO-8601
-  period_end: string;    // ISO-8601
+  periodStart: string;  // ISO-8601
+  periodEnd: string;    // ISO-8601
   tenants: BillingTenantUsage[];
-  total_requests: number;
-  total_tokens: number;
+  totalRequests: number;
+  totalTokens: number;
   /** Present only when a sla_threshold_ms was requested. */
-  sla_stats?: TenantSLAStat[];
+  slaStats?: TenantSLAStat[];
 }
 
 /**
  * Per-team billing rollup — GET /api/v1/platform/teams/{teamId}/billing.
- * Enterprise-gated (billing feature). `by_model` breaks the totals down by model.
+ * Enterprise-gated (billing feature). `byModel` breaks the totals down by model.
  */
 export interface TeamBillingReport {
-  team_id: string;
-  team_name?: string;
-  org_id?: string;
-  period_start: string;
-  period_end: string;
-  total_requests: number;
-  input_tokens: number;
-  output_tokens: number;
-  total_tokens: number;
-  total_cost_usd: number;
-  by_model?: BillingTenantUsage[];
+  teamId: string;
+  teamName?: string;
+  orgId?: string;
+  periodStart: string;
+  periodEnd: string;
+  totalRequests: number;
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  totalCostUsd: number;
+  byModel?: BillingTenantUsage[];
 }
 
 /**
@@ -718,22 +722,22 @@ export interface TeamBillingReport {
  * Enterprise-gated (billing feature). Sums every team discovered under the org.
  */
 export interface OrgBillingReport {
-  org_id: string;
-  org_name?: string;
-  period_start: string;
-  period_end: string;
-  total_cost_usd: number;
-  total_tokens: number;
+  orgId: string;
+  orgName?: string;
+  periodStart: string;
+  periodEnd: string;
+  totalCostUsd: number;
+  totalTokens: number;
   teams: TeamBillingReport[];
 }
 
 /** Quick billing summary (non-gated) for the Settings QuickStatsBar. */
 export interface BillingSummary {
-  period_start: string;
-  period_end: string;
-  total_requests: number;
-  total_tokens: number;
-  active_tenants: number;
+  periodStart: string;
+  periodEnd: string;
+  totalRequests: number;
+  totalTokens: number;
+  activeTenants: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -745,27 +749,27 @@ export interface Organization {
   name: string;
   slug: string;
   description?: string;
-  created_at: string;
-  updated_at: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Team {
   id: string;
-  org_id: string;
+  orgId: string;
   name: string;
   slug: string;
   description?: string;
-  created_at: string;
-  updated_at: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface TeamMember {
   id: number;
-  team_id: string;
-  user_id: string;
-  role_id: string;
-  created_at: string;
-  user?: { email: string; display_name: string };
+  teamId: string;
+  userId: string;
+  roleId: string;
+  createdAt: string;
+  user?: { email: string; displayName: string };
   role?: { name: string; permissions: string[] };
 }
 
@@ -773,19 +777,19 @@ export interface NodePool {
   id: string;
   name: string;
   description?: string;
-  owner_type: 'platform' | 'org' | 'team';
-  owner_id: string;
+  ownerType: 'platform' | 'org' | 'team';
+  ownerId: string;
   policy: 'exclusive' | 'shared';
-  node_ids?: string[];
-  created_at: string;
-  updated_at: string;
+  nodeIds?: string[];
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface PoolTeamQuota {
-  pool_id: string;
-  team_id: string;
-  max_deployments: number;
-  max_gpu_nodes: number;
+  poolId: string;
+  teamId: string;
+  maxDeployments: number;
+  maxGpuNodes: number;
   priority: number;
 }
 
@@ -816,11 +820,11 @@ export interface PlatformUser {
 }
 
 export interface EffectivePermissions {
-  user_id: string;
-  team_id: string;
-  org_id: string;
+  userId: string;
+  teamId: string;
+  orgId: string;
   permissions: string[];
-  is_org_admin: boolean;
+  isOrgAdmin: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -1035,12 +1039,12 @@ export interface SloComplianceModel {
 // ---------------------------------------------------------------------------
 
 export interface BillingForecastEntry {
-  org_id: string;
-  team_id: string;
-  burn_rate_daily_usd: number;
-  projected_monthly_usd: number;
-  budget_monthly_usd: number;
-  days_until_exhaustion: number | null;
+  orgId: string;
+  teamId: string;
+  burnRateDailyUsd: number;
+  projectedMonthlyUsd: number;
+  budgetMonthlyUsd: number;
+  daysUntilExhaustion: number | null;
 }
 
 export interface BillingForecastResponse {
@@ -1056,12 +1060,12 @@ export interface BillingForecastResponse {
 export interface ModelAdoptionBucket {
   date: string;        // YYYY-MM-DD (day) or ISO-week start
   requests: number;
-  tokens_out: number;
+  tokensOut: number;
 }
 
 /** Request/token time-series for a single model. */
 export interface ModelAdoptionSeries {
-  model_id: string;
+  modelId: string;
   buckets: ModelAdoptionBucket[];
 }
 

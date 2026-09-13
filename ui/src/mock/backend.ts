@@ -605,11 +605,11 @@ export const mockBackend: PurserApi = {
   getBillingSummary(): Promise<BillingSummary> {
     const now = new Date().toISOString();
     return Promise.resolve({
-      period_start: now,
-      period_end: now,
-      total_requests: 0,
-      total_tokens: 0,
-      active_tenants: 0,
+      periodStart: now,
+      periodEnd: now,
+      totalRequests: 0,
+      totalTokens: 0,
+      activeTenants: 0,
     });
   },
 
@@ -672,8 +672,8 @@ export const mockBackend: PurserApi = {
       name: data.name,
       slug: data.slug,
       description: data.description,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     }, 400);
   },
 
@@ -682,8 +682,8 @@ export const mockBackend: PurserApi = {
       id,
       name: 'Mock Org',
       slug: 'mock-org',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     }, 200);
   },
 
@@ -698,23 +698,23 @@ export const mockBackend: PurserApi = {
   createTeam(orgId, data): Promise<Team> {
     return delay({
       id: `team-${Math.random().toString(36).slice(2, 10)}`,
-      org_id: orgId,
+      orgId: orgId,
       name: data.name,
       slug: data.slug,
       description: data.description,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     }, 400);
   },
 
   getTeam(id): Promise<Team> {
     return delay({
       id,
-      org_id: 'mock-org',
+      orgId: 'mock-org',
       name: 'Mock Team',
       slug: 'mock-team',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     }, 200);
   },
 
@@ -729,10 +729,10 @@ export const mockBackend: PurserApi = {
   addTeamMember(teamId, data): Promise<TeamMember> {
     return delay({
       id: Math.floor(Math.random() * 10000),
-      team_id: teamId,
-      user_id: data.user_id,
-      role_id: data.role_id,
-      created_at: new Date().toISOString(),
+      teamId: teamId,
+      userId: data.user_id,
+      roleId: data.role_id,
+      createdAt: new Date().toISOString(),
     }, 400);
   },
 
@@ -749,12 +749,12 @@ export const mockBackend: PurserApi = {
       id: `pool-${Math.random().toString(36).slice(2, 10)}`,
       name: data.name ?? 'Mock Pool',
       description: data.description,
-      owner_type: data.owner_type ?? 'platform',
-      owner_id: data.owner_id ?? 'platform',
+      ownerType: data.ownerType ?? 'platform',
+      ownerId: data.ownerId ?? 'platform',
       policy: data.policy ?? 'shared',
-      node_ids: [],
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      nodeIds: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     }, 400);
   },
 
@@ -762,12 +762,12 @@ export const mockBackend: PurserApi = {
     return delay({
       id,
       name: 'Mock Pool',
-      owner_type: 'platform',
-      owner_id: 'platform',
+      ownerType: 'platform',
+      ownerId: 'platform',
       policy: 'shared',
-      node_ids: [],
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      nodeIds: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     }, 200);
   },
 
@@ -776,12 +776,12 @@ export const mockBackend: PurserApi = {
       id,
       name: input.name ?? 'Mock Pool',
       description: input.description,
-      owner_type: 'platform',
-      owner_id: 'platform',
+      ownerType: 'platform',
+      ownerId: 'platform',
       policy: input.policy ?? 'shared',
-      node_ids: [],
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      nodeIds: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     }, 350);
   },
 
@@ -789,8 +789,8 @@ export const mockBackend: PurserApi = {
     return delay(undefined, 350);
   },
 
-  listPoolNodes(): Promise<{ node_ids: string[] }> {
-    return delay({ node_ids: [] });
+  listPoolNodes(): Promise<{ nodeIds: string[] }> {
+    return delay({ nodeIds: [] });
   },
 
   assignNodeToPool(): Promise<void> {
@@ -807,10 +807,10 @@ export const mockBackend: PurserApi = {
 
   upsertPoolQuota(poolId, teamId, quota): Promise<PoolTeamQuota> {
     return delay({
-      pool_id: poolId,
-      team_id: teamId,
-      max_deployments: quota.max_deployments ?? 10,
-      max_gpu_nodes: quota.max_gpu_nodes ?? 4,
+      poolId: poolId,
+      teamId: teamId,
+      maxDeployments: quota.maxDeployments ?? 10,
+      maxGpuNodes: quota.maxGpuNodes ?? 4,
       priority: quota.priority ?? 1,
     }, 350);
   },
@@ -821,11 +821,11 @@ export const mockBackend: PurserApi = {
 
   getMyTeamPermissions(teamId): Promise<EffectivePermissions> {
     return delay({
-      user_id: 'mock-user',
-      team_id: teamId,
-      org_id: 'mock-org',
+      userId: 'mock-user',
+      teamId: teamId,
+      orgId: 'mock-org',
       permissions: ['read', 'deploy'],
-      is_org_admin: false,
+      isOrgAdmin: false,
     }, 200);
   },
 

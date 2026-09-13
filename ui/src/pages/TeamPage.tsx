@@ -142,10 +142,10 @@ function MembersCard({ orgId, teamId }: MembersCardProps) {
 
   function MemberRow({ member }: { member: TeamMember }) {
     const [confirming, setConfirming] = useState(false);
-    const email = member.user?.email ?? member.user_id;
-    const roleName = member.role?.name ?? member.role_id;
-    const joined = member.created_at
-      ? new Date(member.created_at).toLocaleDateString()
+    const email = member.user?.email ?? member.userId;
+    const roleName = member.role?.name ?? member.roleId;
+    const joined = member.createdAt
+      ? new Date(member.createdAt).toLocaleDateString()
       : '—';
 
     return (
@@ -159,7 +159,7 @@ function MembersCard({ orgId, teamId }: MembersCardProps) {
               <Button
                 variant="danger"
                 size="sm"
-                onClick={() => void removeMember.mutateAsync(member.user_id).then(() => setConfirming(false))}
+                onClick={() => void removeMember.mutateAsync(member.userId).then(() => setConfirming(false))}
                 disabled={removeMember.isPending}
               >
                 {t('platform.teams.remove')}
@@ -242,7 +242,7 @@ function NodePoolCard({ teamId }: NodePoolCardProps) {
   // We fetch all pools and find the one owned by this team.
   const { data, isLoading } = useNodePools();
   const pools = data?.pools ?? [];
-  const teamPool = pools.find((p) => p.owner_type === 'team' && p.owner_id === teamId);
+  const teamPool = pools.find((p) => p.ownerType === 'team' && p.ownerId === teamId);
 
   return (
     <Card title={t('platform.teams.nodePool')}>
@@ -302,7 +302,7 @@ function MyPermissionsCard({ teamId }: MyPermissionsCardProps) {
       )}
       {data && (
         <div>
-          {data.is_org_admin && (
+          {data.isOrgAdmin && (
             <div style={{ marginBottom: '0.75rem' }}>
               <Badge tone="warning">Org Admin</Badge>
             </div>

@@ -51,11 +51,11 @@ const mq = queries as unknown as {
 // ---- fixtures --------------------------------------------------------------
 
 function team(id: string, name: string, slug: string): Team {
-  return { id, org_id: 'org-1', name, slug, created_at: '', updated_at: '' };
+  return { id, orgId: 'org-1', name, slug, createdAt: '', updatedAt: '' };
 }
 
 function org(id: string, name: string, slug: string): Organization {
-  return { id, name, slug, created_at: '', updated_at: '' } as Organization;
+  return { id, name, slug, createdAt: '', updatedAt: '' };
 }
 
 function teamsSuccess(teams: Team[]) {

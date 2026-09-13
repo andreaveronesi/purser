@@ -57,7 +57,7 @@ function CreatePoolModal({ onClose }: CreatePoolModalProps) {
   const t = useT();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [ownerType, setOwnerType] = useState<NodePool['owner_type']>('platform');
+  const [ownerType, setOwnerType] = useState<NodePool['ownerType']>('platform');
   const [ownerId, setOwnerId] = useState('platform');
   const [policy, setPolicy] = useState<NodePool['policy']>('shared');
   const nameId = useFieldId('pool-name');
@@ -72,8 +72,8 @@ function CreatePoolModal({ onClose }: CreatePoolModalProps) {
     void createPool.mutateAsync({
       name: name.trim(),
       description: description.trim() || undefined,
-      owner_type: ownerType,
-      owner_id: ownerId.trim() || 'platform',
+      ownerType: ownerType,
+      ownerId: ownerId.trim() || 'platform',
       policy,
     }).then(onClose);
   }
@@ -125,7 +125,7 @@ function CreatePoolModal({ onClose }: CreatePoolModalProps) {
             id={ownerTypeId}
             className="select"
             value={ownerType}
-            onChange={(e) => setOwnerType(e.target.value as NodePool['owner_type'])}
+            onChange={(e) => setOwnerType(e.target.value as NodePool['ownerType'])}
           >
             <option value="platform">platform</option>
             <option value="org">org</option>
@@ -273,7 +273,7 @@ function PoolDetail({ pool }: PoolDetailProps) {
   const assignNode = useAssignNodeToPool();
   const removeNode = useRemoveNodeFromPool();
 
-  const nodeIds = nodesData?.node_ids ?? [];
+  const nodeIds = nodesData?.nodeIds ?? [];
   const quotas = quotasData?.quotas ?? [];
 
   function handleAssign() {
@@ -355,10 +355,10 @@ function PoolDetail({ pool }: PoolDetailProps) {
                 </thead>
                 <tbody>
                   {quotas.map((q: PoolTeamQuota) => (
-                    <tr key={q.team_id}>
-                      <td><code className="inline-code">{q.team_id}</code></td>
-                      <td>{q.max_deployments}</td>
-                      <td>{q.max_gpu_nodes}</td>
+                    <tr key={q.teamId}>
+                      <td><code className="inline-code">{q.teamId}</code></td>
+                      <td>{q.maxDeployments}</td>
+                      <td>{q.maxGpuNodes}</td>
                       <td>{q.priority}</td>
                     </tr>
                   ))}
@@ -386,8 +386,8 @@ function PoolRow({ pool }: PoolRowProps) {
   const [editing, setEditing] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const deletePool = useDeleteNodePool();
-  const nodeCount = pool.node_ids?.length ?? '—';
-  const hasNodes = (pool.node_ids?.length ?? 0) > 0;
+  const nodeCount = pool.nodeIds?.length ?? '—';
+  const hasNodes = (pool.nodeIds?.length ?? 0) > 0;
 
   function handleDelete() {
     if (!confirmingDelete) {
@@ -405,7 +405,7 @@ function PoolRow({ pool }: PoolRowProps) {
         <td style={{ fontWeight: 600 }}>{pool.name}</td>
         <td>
           <span style={{ fontSize: '0.85em', color: 'var(--color-text-muted)' }}>
-            {pool.owner_type}/{pool.owner_id}
+            {pool.ownerType}/{pool.ownerId}
           </span>
         </td>
         <td><PolicyBadge policy={pool.policy} /></td>

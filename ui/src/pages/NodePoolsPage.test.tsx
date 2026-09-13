@@ -39,12 +39,12 @@ function mkPool(overrides: Partial<NodePool> = {}): NodePool {
     id: 'pool-1',
     name: 'gpu-pool-a',
     description: 'primary',
-    owner_type: 'platform',
-    owner_id: 'platform',
+    ownerType: 'platform',
+    ownerId: 'platform',
     policy: 'shared',
-    node_ids: [],
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+    nodeIds: [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
     ...overrides,
   };
 }
@@ -55,7 +55,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mq.useNodePools.mockReturnValue({ data: { pools: [mkPool()] }, isLoading: false, isError: false, error: null, refetch: vi.fn() });
   mq.useCreateNodePool.mockReturnValue(idleMutation());
-  mq.usePoolNodes.mockReturnValue({ data: { node_ids: [] }, isLoading: false });
+  mq.usePoolNodes.mockReturnValue({ data: { nodeIds: [] }, isLoading: false });
   mq.usePoolQuotas.mockReturnValue({ data: { quotas: [] } });
   mq.useAssignNodeToPool.mockReturnValue(idleMutation());
   mq.useRemoveNodeFromPool.mockReturnValue(idleMutation());

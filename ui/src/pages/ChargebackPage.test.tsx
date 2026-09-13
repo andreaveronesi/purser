@@ -38,23 +38,25 @@ import { ChargebackPage } from './ChargebackPage';
 import * as queries from '../hooks/queries';
 import { api } from '../api/client';
 
-// Minimal billing report for tests that need data loaded.
+// Minimal billing report for tests — uses the REAL camelCase shape that
+// camelizeKeys() delivers at runtime (snake_case fields would silently be
+// undefined and cause .toFixed() crashes, which is exactly what this migration fixes).
 const MOCK_REPORT = {
-  period_start: '2026-09-01T00:00:00Z',
-  period_end: '2026-09-08T00:00:00Z',
-  total_requests: 42,
-  total_tokens: 8400,
+  periodStart: '2026-09-01T00:00:00Z',
+  periodEnd: '2026-09-08T00:00:00Z',
+  totalRequests: 42,
+  totalTokens: 8400,
   tenants: [
     {
-      tenant_id: 'acme/eng',
-      model_id: 'llama3-8b',
-      request_count: 42,
-      prompt_tokens: 4200,
-      completion_tokens: 4200,
-      total_tokens: 8400,
-      avg_latency_ms: 210.5,
-      period_start: '2026-09-01T00:00:00Z',
-      period_end: '2026-09-08T00:00:00Z',
+      tenantId: 'acme/eng',
+      modelId: 'llama3-8b',
+      requestCount: 42,
+      promptTokens: 4200,
+      completionTokens: 4200,
+      totalTokens: 8400,
+      avgLatencyMs: 210.5,
+      periodStart: '2026-09-01T00:00:00Z',
+      periodEnd: '2026-09-08T00:00:00Z',
     },
   ],
 };
@@ -140,10 +142,10 @@ const MOCK_ADOPTION = {
   days: 30,
   series: [
     {
-      model_id: 'llama3-8b',
+      modelId: 'llama3-8b',
       buckets: [
-        { date: '2026-09-01', requests: 10, tokens_out: 1000 },
-        { date: '2026-09-02', requests: 25, tokens_out: 2500 },
+        { date: '2026-09-01', requests: 10, tokensOut: 1000 },
+        { date: '2026-09-02', requests: 25, tokensOut: 2500 },
       ],
     },
   ],
@@ -181,7 +183,7 @@ describe('ChargebackPage — SLA compliance tab', () => {
         return {
           data: {
             ...MOCK_REPORT,
-            sla_stats: [{ tenant_id: 'acme/eng', sla_compliance_rate: 0.95, sla_threshold_ms: 2000 }],
+            slaStats: [{ tenantId: 'acme/eng', slaComplianceRate: 0.95, slaThresholdMs: 2000 }],
           },
           isLoading: false,
           error: null,
@@ -247,7 +249,7 @@ describe('ChargebackPage — usage tab loading/error', () => {
 
   it('shows empty usage table when report has zero tenants', () => {
     mq.useBillingReport.mockReturnValue({
-      data: { ...MOCK_REPORT, tenants: [], total_requests: 0, total_tokens: 0 },
+      data: { ...MOCK_REPORT, tenants: [], totalRequests: 0, totalTokens: 0 },
       isLoading: false,
       error: null,
     });
@@ -257,17 +259,17 @@ describe('ChargebackPage — usage tab loading/error', () => {
 
   it('renders the summary stats (requests, tokens, active tenants) when report is loaded', () => {
     renderPage();
-    // MOCK_REPORT has total_requests=42, total_tokens=8400, 1 unique tenant
+    // MOCK_REPORT has totalRequests=42, totalTokens=8400, 1 unique tenant
     // Multiple "42" values may exist (request_count in the table row too); use getAllByText
     expect(screen.getAllByText('42').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('8,400')).toBeInTheDocument();
   });
 
-  it('renders the usage table rows with tenant_id, model_id, and avg_latency_ms.toFixed(1)', () => {
+  it('renders the usage table rows with tenantId, modelId, and avgLatencyMs.toFixed(1)', () => {
     renderPage();
     expect(screen.getByText('acme/eng')).toBeInTheDocument();
     expect(screen.getByText('llama3-8b')).toBeInTheDocument();
-    // avg_latency_ms = 210.5 → "210.5 ms"
+    // avgLatencyMs = 210.5 → "210.5 ms"
     expect(screen.getByText('210.5 ms')).toBeInTheDocument();
   });
 
@@ -293,12 +295,12 @@ describe('ChargebackPage — usage tab loading/error', () => {
 const MOCK_FORECAST = {
   entries: [
     {
-      org_id: 'org-1',
-      team_id: 'team-eng',
-      burn_rate_daily_usd: 5.50,
-      projected_monthly_usd: 165.0,
-      budget_monthly_usd: 200.0,
-      days_until_exhaustion: null,
+      orgId: 'org-1',
+      teamId: 'team-eng',
+      burnRateDailyUsd: 5.50,
+      projectedMonthlyUsd: 165.0,
+      budgetMonthlyUsd: 200.0,
+      daysUntilExhaustion: null,
     },
   ],
 };
@@ -306,12 +308,12 @@ const MOCK_FORECAST = {
 const MOCK_FORECAST_DANGER = {
   entries: [
     {
-      org_id: 'org-1',
-      team_id: 'team-eng',
-      burn_rate_daily_usd: 30.0,
-      projected_monthly_usd: 900.0,
-      budget_monthly_usd: 200.0,
-      days_until_exhaustion: 3, // < 7 → danger
+      orgId: 'org-1',
+      teamId: 'team-eng',
+      burnRateDailyUsd: 30.0,
+      projectedMonthlyUsd: 900.0,
+      budgetMonthlyUsd: 200.0,
+      daysUntilExhaustion: 3, // < 7 → danger
     },
   ],
 };
@@ -421,7 +423,7 @@ describe('ChargebackPage — model adoption tab extended', () => {
     mq.useModelAdoption.mockReturnValue({
       data: {
         window: 'daily', days: 30,
-        series: [{ model_id: 'llama3-8b', buckets: [{ date: '2026-09-01', requests: 0, tokens_out: 0 }] }],
+        series: [{ modelId: 'llama3-8b', buckets: [{ date: '2026-09-01', requests: 0, tokensOut: 0 }] }],
       },
       isLoading: false,
       error: null,
@@ -494,7 +496,7 @@ describe('ChargebackPage — SLA tab extended', () => {
   it('shows empty state in SLA tab when sla_stats is empty', () => {
     mq.useBillingReport.mockImplementation((params: { slaThresholdMs?: number }) => {
       if (params.slaThresholdMs != null) {
-        return { data: { ...MOCK_REPORT, sla_stats: [] }, isLoading: false, error: null };
+        return { data: { ...MOCK_REPORT, slaStats: [] }, isLoading: false, error: null };
       }
       return { data: MOCK_REPORT, isLoading: false, error: null };
     });
@@ -509,7 +511,7 @@ describe('ChargebackPage — SLA tab extended', () => {
         return {
           data: {
             ...MOCK_REPORT,
-            sla_stats: [{ tenant_id: 'acme/eng', sla_compliance_rate: 0.995, sla_threshold_ms: 2000 }],
+            slaStats: [{ tenantId: 'acme/eng', slaComplianceRate: 0.995, slaThresholdMs: 2000 }],
           },
           isLoading: false,
           error: null,
@@ -529,7 +531,7 @@ describe('ChargebackPage — SLA tab extended', () => {
         return {
           data: {
             ...MOCK_REPORT,
-            sla_stats: [{ tenant_id: 'acme/eng', sla_compliance_rate: 0.97, sla_threshold_ms: 2000 }],
+            slaStats: [{ tenantId: 'acme/eng', slaComplianceRate: 0.97, slaThresholdMs: 2000 }],
           },
           isLoading: false,
           error: null,
@@ -548,7 +550,7 @@ describe('ChargebackPage — SLA tab extended', () => {
         return {
           data: {
             ...MOCK_REPORT,
-            sla_stats: [{ tenant_id: 'acme/eng', sla_compliance_rate: 0.80, sla_threshold_ms: 2000 }],
+            slaStats: [{ tenantId: 'acme/eng', slaComplianceRate: 0.80, slaThresholdMs: 2000 }],
           },
           isLoading: false,
           error: null,
@@ -563,7 +565,7 @@ describe('ChargebackPage — SLA tab extended', () => {
 
   it('threshold input changes trigger re-fetch with new threshold', () => {
     mq.useBillingReport.mockImplementation(() => ({
-      data: { ...MOCK_REPORT, sla_stats: [] }, isLoading: false, error: null,
+      data: { ...MOCK_REPORT, slaStats: [] }, isLoading: false, error: null,
     }));
     renderPage();
     fireEvent.click(screen.getByRole('tab', { name: 'chargeback.tab.sla' }));
@@ -580,48 +582,48 @@ describe('ChargebackPage — SLA tab extended', () => {
 // ---------------------------------------------------------------------------
 
 const MOCK_ORG_REPORT = {
-  org_id: 'org-1',
-  period_start: '2026-09-01T00:00:00Z',
-  period_end: '2026-09-08T00:00:00Z',
-  total_cost_usd: 120.50,
-  total_tokens: 50000,
+  orgId: 'org-1',
+  periodStart: '2026-09-01T00:00:00Z',
+  periodEnd: '2026-09-08T00:00:00Z',
+  totalCostUsd: 120.50,
+  totalTokens: 50000,
   teams: [
     {
-      team_id: 'team-eng',
-      team_name: 'Engineering',
-      org_id: 'org-1',
-      period_start: '2026-09-01T00:00:00Z',
-      period_end: '2026-09-08T00:00:00Z',
-      total_requests: 100,
-      input_tokens: 20000,
-      output_tokens: 30000,
-      total_tokens: 50000,
-      total_cost_usd: 120.50,
+      teamId: 'team-eng',
+      teamName: 'Engineering',
+      orgId: 'org-1',
+      periodStart: '2026-09-01T00:00:00Z',
+      periodEnd: '2026-09-08T00:00:00Z',
+      totalRequests: 100,
+      inputTokens: 20000,
+      outputTokens: 30000,
+      totalTokens: 50000,
+      totalCostUsd: 120.50,
     },
   ],
 };
 
 const MOCK_TEAM_REPORT = {
-  team_id: 'team-eng',
-  team_name: 'Engineering',
-  period_start: '2026-09-01T00:00:00Z',
-  period_end: '2026-09-08T00:00:00Z',
-  total_requests: 100,
-  input_tokens: 20000,
-  output_tokens: 30000,
-  total_tokens: 50000,
-  total_cost_usd: 120.50,
-  by_model: [
+  teamId: 'team-eng',
+  teamName: 'Engineering',
+  periodStart: '2026-09-01T00:00:00Z',
+  periodEnd: '2026-09-08T00:00:00Z',
+  totalRequests: 100,
+  inputTokens: 20000,
+  outputTokens: 30000,
+  totalTokens: 50000,
+  totalCostUsd: 120.50,
+  byModel: [
     {
-      tenant_id: 'team-eng',
-      model_id: 'llama3-8b',
-      request_count: 100,
-      prompt_tokens: 20000,
-      completion_tokens: 30000,
-      total_tokens: 50000,
-      avg_latency_ms: 300.0,
-      period_start: '2026-09-01T00:00:00Z',
-      period_end: '2026-09-08T00:00:00Z',
+      tenantId: 'team-eng',
+      modelId: 'llama3-8b',
+      requestCount: 100,
+      promptTokens: 20000,
+      completionTokens: 30000,
+      totalTokens: 50000,
+      avgLatencyMs: 300.0,
+      periodStart: '2026-09-01T00:00:00Z',
+      periodEnd: '2026-09-08T00:00:00Z',
     },
   ],
 };
@@ -754,7 +756,7 @@ describe('ChargebackPage — tenants tab', () => {
 
   it('shows empty state in team billing table when by_model is empty', () => {
     mq.useTeamBilling.mockReturnValue({
-      data: { ...MOCK_TEAM_REPORT, by_model: [] }, isLoading: false, error: null,
+      data: { ...MOCK_TEAM_REPORT, byModel: [] }, isLoading: false, error: null,
     });
     renderPage();
     fireEvent.click(screen.getByRole('tab', { name: 'chargeback.tab.tenants' }));

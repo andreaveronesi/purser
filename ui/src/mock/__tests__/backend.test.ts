@@ -685,11 +685,11 @@ describe('billing URLs', () => {
 describe('mockBackend.getBillingSummary', () => {
   it('returns a billing summary with zero totals in mock mode', async () => {
     const summary = await mockBackend.getBillingSummary();
-    expect(typeof summary.total_requests).toBe('number');
-    expect(typeof summary.total_tokens).toBe('number');
-    expect(summary.total_requests).toBe(0);
-    expect(summary.total_tokens).toBe(0);
-    expect(summary.active_tenants).toBe(0);
+    expect(typeof summary.totalRequests).toBe('number');
+    expect(typeof summary.totalTokens).toBe('number');
+    expect(summary.totalRequests).toBe(0);
+    expect(summary.totalTokens).toBe(0);
+    expect(summary.activeTenants).toBe(0);
   });
 });
 
@@ -1001,15 +1001,15 @@ describe('team stubs', () => {
     expect(resp.teams).toEqual([]);
   });
 
-  it('createTeam returns a team with org_id', async () => {
+  it('createTeam returns a team with orgId', async () => {
     const team = await flush(mockBackend.createTeam('org-1', { name: 'Dev', slug: 'dev' }));
-    expect(team.org_id).toBe('org-1');
+    expect(team.orgId).toBe('org-1');
     expect(team.name).toBe('Dev');
   });
 
-  it('addTeamMember returns a member with team_id', async () => {
+  it('addTeamMember returns a member with teamId', async () => {
     const member = await flush(mockBackend.addTeamMember('team-1', { user_id: 'user-1', role_id: 'viewer' }));
-    expect(member.team_id).toBe('team-1');
+    expect(member.teamId).toBe('team-1');
     expect(typeof member.id).toBe('number');
   });
 });
@@ -1024,17 +1024,17 @@ describe('node pool stubs', () => {
     const pool = await flush(mockBackend.createNodePool({ name: 'gpu-pool' }));
     expect(pool.name).toBe('gpu-pool');
     expect(typeof pool.id).toBe('string');
-    expect(Array.isArray(pool.node_ids)).toBe(true);
+    expect(Array.isArray(pool.nodeIds)).toBe(true);
   });
 
   it('upsertPoolQuota returns a quota with the provided values', async () => {
     const quota = await flush(
-      mockBackend.upsertPoolQuota('pool-1', 'team-1', { max_deployments: 5, max_gpu_nodes: 2, priority: 3 }),
+      mockBackend.upsertPoolQuota('pool-1', 'team-1', { maxDeployments: 5, maxGpuNodes: 2, priority: 3 }),
     );
-    expect(quota.pool_id).toBe('pool-1');
-    expect(quota.team_id).toBe('team-1');
-    expect(quota.max_deployments).toBe(5);
-    expect(quota.max_gpu_nodes).toBe(2);
+    expect(quota.poolId).toBe('pool-1');
+    expect(quota.teamId).toBe('team-1');
+    expect(quota.maxDeployments).toBe(5);
+    expect(quota.maxGpuNodes).toBe(2);
     expect(quota.priority).toBe(3);
   });
 });
@@ -1070,10 +1070,10 @@ describe('mockBackend.getMe', () => {
 });
 
 describe('mockBackend.getMyTeamPermissions', () => {
-  it('returns effective permissions with user_id and permissions array', async () => {
+  it('returns effective permissions with userId and permissions array', async () => {
     const perms = await flush(mockBackend.getMyTeamPermissions('team-1'));
-    expect(perms.user_id).toBe('mock-user');
-    expect(perms.team_id).toBe('team-1');
+    expect(perms.userId).toBe('mock-user');
+    expect(perms.teamId).toBe('team-1');
     expect(Array.isArray(perms.permissions)).toBe(true);
   });
 });
@@ -1260,9 +1260,9 @@ describe('platform user stubs', () => {
 // ---------------------------------------------------------------------------
 
 describe('pool node and quota operations', () => {
-  it('listPoolNodes returns node_ids array', async () => {
+  it('listPoolNodes returns nodeIds array', async () => {
     const resp = await flush(mockBackend.listPoolNodes('pool-1'));
-    expect(Array.isArray(resp.node_ids)).toBe(true);
+    expect(Array.isArray(resp.nodeIds)).toBe(true);
   });
 
   it('assignNodeToPool resolves without throwing', async () => {
@@ -1330,13 +1330,13 @@ describe('team operations', () => {
 // ---------------------------------------------------------------------------
 
 describe('mockBackend.upsertPoolQuota — ?? defaults', () => {
-  it('applies default max_deployments=10, max_gpu_nodes=4, priority=1 when fields are omitted', async () => {
-    // Passes an empty quota object {} so all three ?? fallbacks fire (lines 812-814).
+  it('applies default maxDeployments=10, maxGpuNodes=4, priority=1 when fields are omitted', async () => {
+    // Passes an empty quota object {} so all three ?? fallbacks fire.
     const quota = await flush(
       mockBackend.upsertPoolQuota('pool-default', 'team-default', {}),
     );
-    expect(quota.max_deployments).toBe(10);
-    expect(quota.max_gpu_nodes).toBe(4);
+    expect(quota.maxDeployments).toBe(10);
+    expect(quota.maxGpuNodes).toBe(4);
     expect(quota.priority).toBe(1);
   });
 });
@@ -1464,15 +1464,15 @@ describe('mockBackend.getPlan — loop FALSE branch (line 392)', () => {
   });
 });
 
-describe('mockBackend.createNodePool — ?? defaults (line 750)', () => {
-  it('applies default name, owner_type, owner_id, policy when all fields are omitted', async () => {
-    // Passes an empty data object {} so all ?? fallbacks fire (line 750 and relatives).
+describe('mockBackend.createNodePool — ?? defaults', () => {
+  it('applies default name, ownerType, ownerId, policy when all fields are omitted', async () => {
+    // Passes an empty data object {} so all ?? fallbacks fire.
     const pool = await flush(mockBackend.createNodePool({}));
     expect(pool.name).toBe('Mock Pool');
-    expect(pool.owner_type).toBe('platform');
-    expect(pool.owner_id).toBe('platform');
+    expect(pool.ownerType).toBe('platform');
+    expect(pool.ownerId).toBe('platform');
     expect(pool.policy).toBe('shared');
-    expect(Array.isArray(pool.node_ids)).toBe(true);
+    expect(Array.isArray(pool.nodeIds)).toBe(true);
   });
 });
 

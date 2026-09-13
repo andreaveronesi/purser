@@ -36,11 +36,11 @@ import {
 
 const TEAM: Team = {
   id: 'team-1',
-  org_id: 'org-1',
+  orgId: 'org-1',
   name: 'Team One',
   slug: 'team-one',
-  created_at: '2026-01-01T00:00:00Z',
-  updated_at: '2026-01-01T00:00:00Z',
+  createdAt: '2026-01-01T00:00:00Z',
+  updatedAt: '2026-01-01T00:00:00Z',
 };
 
 const ROLES: CustomRole[] = [
@@ -64,7 +64,7 @@ function mockAll() {
   vi.mocked(useAddTeamMember).mockReturnValue(mut());
   vi.mocked(useRemoveTeamMember).mockReturnValue(mut());
   vi.mocked(useNodePools).mockReturnValue(qr({ data: { pools: [] } }));
-  vi.mocked(useMyTeamPermissions).mockReturnValue(qr({ data: { permissions: [], is_org_admin: false } }));
+  vi.mocked(useMyTeamPermissions).mockReturnValue(qr({ data: { permissions: [], isOrgAdmin: false } }));
   vi.mocked(useRoles).mockReturnValue(qr({ data: { roles: ROLES } }));
 }
 
@@ -165,11 +165,11 @@ describe('TeamPage — remove member (confirm-first)', () => {
           members: [
             {
               id: 1,
-              team_id: 'team-1',
-              user_id: 'alice@example.com',
-              role_id: 'developer',
-              created_at: '2026-01-01T00:00:00Z',
-              user: { email: 'alice@example.com', display_name: 'Alice' },
+              teamId: 'team-1',
+              userId: 'alice@example.com',
+              roleId: 'developer',
+              createdAt: '2026-01-01T00:00:00Z',
+              user: { email: 'alice@example.com', displayName: 'Alice' },
               role: { name: 'Developer', permissions: [] },
             },
           ],
@@ -196,9 +196,9 @@ describe('TeamPage — remove member (confirm-first)', () => {
 // ---------------------------------------------------------------------------
 
 describe('TeamPage — My Permissions card', () => {
-  it('renders Org Admin badge when is_org_admin is true', () => {
+  it('renders Org Admin badge when isOrgAdmin is true', () => {
     vi.mocked(useMyTeamPermissions).mockReturnValue(
-      qr({ data: { permissions: [], is_org_admin: true } }),
+      qr({ data: { permissions: [], isOrgAdmin: true } }),
     );
     renderPage();
     expect(screen.getByText('Org Admin')).toBeInTheDocument();
@@ -206,7 +206,7 @@ describe('TeamPage — My Permissions card', () => {
 
   it('renders permission badges when permissions are non-empty', () => {
     vi.mocked(useMyTeamPermissions).mockReturnValue(
-      qr({ data: { permissions: ['team:models:deploy', 'inference:call'], is_org_admin: false } }),
+      qr({ data: { permissions: ['team:models:deploy', 'inference:call'], isOrgAdmin: false } }),
     );
     renderPage();
     expect(screen.getByText('team:models:deploy')).toBeInTheDocument();
@@ -215,7 +215,7 @@ describe('TeamPage — My Permissions card', () => {
 
   it('shows empty-permissions message when permissions array is empty and not org admin', () => {
     vi.mocked(useMyTeamPermissions).mockReturnValue(
-      qr({ data: { permissions: [], is_org_admin: false } }),
+      qr({ data: { permissions: [], isOrgAdmin: false } }),
     );
     renderPage();
     // No Org Admin badge
@@ -235,7 +235,7 @@ describe('TeamPage — My Permissions card', () => {
 
   it('renders admin-toned badge for admin-prefixed permissions', () => {
     vi.mocked(useMyTeamPermissions).mockReturnValue(
-      qr({ data: { permissions: ['admin:something'], is_org_admin: false } }),
+      qr({ data: { permissions: ['admin:something'], isOrgAdmin: false } }),
     );
     renderPage();
     expect(screen.getByText('admin:something')).toBeInTheDocument();
@@ -243,7 +243,7 @@ describe('TeamPage — My Permissions card', () => {
 
   it('renders info-toned badge for deploy-prefixed permissions', () => {
     vi.mocked(useMyTeamPermissions).mockReturnValue(
-      qr({ data: { permissions: ['deploy:model'], is_org_admin: false } }),
+      qr({ data: { permissions: ['deploy:model'], isOrgAdmin: false } }),
     );
     renderPage();
     expect(screen.getByText('deploy:model')).toBeInTheDocument();
@@ -279,10 +279,10 @@ describe('TeamPage — NodePoolCard', () => {
             {
               id: 'pool-1',
               name: 'GPU Cluster Alpha',
-              owner_type: 'team',
-              owner_id: 'team-1',
+              ownerType: 'team',
+              ownerId: 'team-1',
               policy: 'exclusive',
-              nodes: [],
+              nodeIds: [],
             },
           ],
         },
@@ -301,10 +301,10 @@ describe('TeamPage — NodePoolCard', () => {
             {
               id: 'pool-2',
               name: 'Shared Inference Pool',
-              owner_type: 'team',
-              owner_id: 'team-1',
+              ownerType: 'team',
+              ownerId: 'team-1',
               policy: 'shared',
-              nodes: [],
+              nodeIds: [],
             },
           ],
         },
@@ -322,10 +322,10 @@ describe('TeamPage — NodePoolCard', () => {
             {
               id: 'pool-other',
               name: 'Other Team Pool',
-              owner_type: 'team',
-              owner_id: 'team-other',
+              ownerType: 'team',
+              ownerId: 'team-other',
               policy: 'exclusive',
-              nodes: [],
+              nodeIds: [],
             },
           ],
         },
@@ -368,18 +368,18 @@ describe('TeamPage — InviteMemberModal edge cases', () => {
 // ---------------------------------------------------------------------------
 
 describe('TeamPage — MemberRow edge cases', () => {
-  it('shows dash when member.created_at is null', () => {
+  it('shows dash when member.createdAt is null', () => {
     vi.mocked(useTeamMembers).mockReturnValue(
       qr({
         data: {
           members: [
             {
               id: 2,
-              team_id: 'team-1',
-              user_id: 'bob@example.com',
-              role_id: 'developer',
-              created_at: null,
-              user: { email: 'bob@example.com', display_name: 'Bob' },
+              teamId: 'team-1',
+              userId: 'bob@example.com',
+              roleId: 'developer',
+              createdAt: null,
+              user: { email: 'bob@example.com', displayName: 'Bob' },
               role: { name: 'Developer', permissions: [] },
             },
           ],
@@ -387,7 +387,7 @@ describe('TeamPage — MemberRow edge cases', () => {
       }),
     );
     renderPage();
-    // The '—' appears in the joined column when created_at is null
+    // The '—' appears in the joined column when createdAt is null
     expect(screen.getByText('—')).toBeInTheDocument();
   });
 });

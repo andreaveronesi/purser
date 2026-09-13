@@ -259,7 +259,7 @@ export interface PurserApi {
   updateNodePool(id: string, input: UpdateNodePoolInput): Promise<NodePool>;
   /** DELETE /api/v1/platform/pools/{id} — delete a pool. 409 if it still has assigned nodes. */
   deleteNodePool(id: string): Promise<void>;
-  listPoolNodes(poolId: string): Promise<{ node_ids: string[] }>;
+  listPoolNodes(poolId: string): Promise<{ nodeIds: string[] }>;
   assignNodeToPool(poolId: string, nodeId: string): Promise<void>;
   removeNodeFromPool(poolId: string, nodeId: string): Promise<void>;
   listPoolQuotas(poolId: string): Promise<{ quotas: PoolTeamQuota[] }>;
