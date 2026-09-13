@@ -365,6 +365,49 @@ describe('WhatIfPlannerPage', () => {
     expect(document.querySelectorAll('.what-if-node-row').length).toBe(1);
   });
 
+  // --- Framing fix: comparative block (W1) ------------------------------------
+  // These tests prove the two-scenario framing; they fail before the fix because
+  // the old component uses a single badge + muted span without distinct labels.
+
+  it('shows both scenario labels when currentPlan is present (failing before fix)', () => {
+    const result: WhatIfResult = { feasible: false, currentPlan: { feasible: true } };
+    mockUseWhatIfPlan.mockReturnValue(successMutation(result));
+    renderPage();
+
+    expect(screen.getByText('planner.whatIf.result.withSimulated')).toBeInTheDocument();
+    expect(screen.getByText('planner.whatIf.result.currentFleet')).toBeInTheDocument();
+  });
+
+  it('shows no-improvement row when simulated infeasible but current fleet feasible (failing before fix)', () => {
+    const result: WhatIfResult = { feasible: false, currentPlan: { feasible: true } };
+    mockUseWhatIfPlan.mockReturnValue(successMutation(result));
+    renderPage();
+
+    expect(screen.getByText('planner.whatIf.result.noImprovement')).toBeInTheDocument();
+  });
+
+  it('shows only simulated row and no currentFleet row when currentPlan absent (failing before fix)', () => {
+    const result: WhatIfResult = { feasible: true, assignments: [] };
+    mockUseWhatIfPlan.mockReturnValue(successMutation(result));
+    renderPage();
+
+    expect(screen.getByText('planner.whatIf.result.withSimulated')).toBeInTheDocument();
+    expect(screen.queryByText('planner.whatIf.result.currentFleet')).toBeNull();
+    expect(screen.queryByText('planner.whatIf.result.noImprovement')).toBeNull();
+  });
+
+  it('whatif-simulated-badge and whatif-current-badge carry correct verdicts (failing before fix)', () => {
+    const result: WhatIfResult = { feasible: false, currentPlan: { feasible: true } };
+    mockUseWhatIfPlan.mockReturnValue(successMutation(result));
+    renderPage();
+
+    const simulatedBadge = screen.getByTestId('whatif-simulated-badge');
+    expect(simulatedBadge.textContent).toContain('planner.whatIf.result.infeasible');
+
+    const currentBadge = screen.getByTestId('whatif-current-badge');
+    expect(currentBadge.textContent).toContain('planner.whatIf.result.feasible');
+  });
+
   // --- Empty state ------------------------------------------------------------
 
   it('shows empty state hint when no model selected and no result', () => {
