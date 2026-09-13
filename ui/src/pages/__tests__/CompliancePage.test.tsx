@@ -35,6 +35,7 @@ vi.mock('../../hooks/queries', () => ({
 
 import { CompliancePage } from '../CompliancePage';
 import { api } from '../../api/client';
+import { ApiError } from '../../api/http';
 import { useGdprErasure, useGdprErasureLog } from '../../hooks/queries';
 
 const mockErasure = useGdprErasure as unknown as ReturnType<typeof vi.fn>;
@@ -128,5 +129,149 @@ describe('CompliancePage', () => {
   it('(c) renders the erasure-log empty state without crashing', () => {
     renderPage();
     expect(screen.getByText(/no erasure operations/i)).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ErasureCard — extra states
+// ---------------------------------------------------------------------------
+
+describe('CompliancePage — ErasureCard states', () => {
+  it('submit button is disabled when subject input is empty', () => {
+    renderPage();
+    const submitBtn = screen.getByRole('button', { name: /erase records/i });
+    expect(submitBtn).toBeDisabled();
+  });
+
+  it('shows pending label while erasure is in progress', () => {
+    mockErasure.mockReturnValue({ mutate: erasureMutate, isPending: true, isError: false, error: null });
+    renderPage();
+    expect(screen.getByRole('button', { name: /erasing/i })).toBeInTheDocument();
+  });
+
+  it('shows forbidden error message on 403', () => {
+    mockErasure.mockReturnValue({
+      mutate: erasureMutate,
+      isPending: false,
+      isError: true,
+      error: new ApiError(403, 'forbidden', {}),
+    });
+    renderPage();
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    expect(screen.getByText('Admin role required — this operation is restricted to administrators.')).toBeInTheDocument();
+  });
+
+  it('shows generic erasure error for non-license non-403 errors', () => {
+    mockErasure.mockReturnValue({
+      mutate: erasureMutate,
+      isPending: false,
+      isError: true,
+      error: new Error('internal server error'),
+    });
+    renderPage();
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    expect(screen.getByText('Could not complete the erasure. Retry in a moment.')).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ErasureLogCard — entries rendering
+// ---------------------------------------------------------------------------
+
+import type { GdprErasureLogEntry } from '../../api/types';
+
+const MOCK_ERASURE_LOG: GdprErasureLogEntry[] = [
+  {
+    id: 1,
+    subjectHash: 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2',
+    erasedAt: '2026-09-10T12:00:00Z',
+    erasedBy: 'admin@acme',
+    reason: 'GDPR request',
+    eventsErased: 42,
+    erasureType: 'inference_audit',
+  },
+  {
+    id: 2,
+    subjectHash: 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef',
+    erasedAt: '',
+    erasedBy: 'admin@acme',
+    reason: '',
+    eventsErased: 0,
+    erasureType: 'inference_audit',
+  },
+];
+
+describe('CompliancePage — ErasureLogCard with entries', () => {
+  it('renders erasure log entries with truncated subject hash and events count', () => {
+    mockErasureLog.mockReturnValue({
+      data: MOCK_ERASURE_LOG, isLoading: false, isError: false, error: null, refetch: vi.fn(),
+    });
+    renderPage();
+    // First entry: subjectHash.slice(0, 12)… = "a1b2c3d4e5f6…"
+    expect(screen.getByText('a1b2c3d4e5f6…')).toBeInTheDocument();
+    // eventsErased = 42
+    expect(screen.getByText('42')).toBeInTheDocument();
+    // erasedBy
+    expect(screen.getAllByText('admin@acme').length).toBeGreaterThan(0);
+    // reason "GDPR request"
+    expect(screen.getByText('GDPR request')).toBeInTheDocument();
+  });
+
+  it('renders "—" for entry with empty erasedAt', () => {
+    mockErasureLog.mockReturnValue({
+      data: MOCK_ERASURE_LOG, isLoading: false, isError: false, error: null, refetch: vi.fn(),
+    });
+    renderPage();
+    // Second entry has erasedAt = '' which is falsy → renders '—'
+    expect(screen.getAllByText('—').length).toBeGreaterThan(0);
+  });
+
+  it('shows loading spinner in erasure log', () => {
+    mockErasureLog.mockReturnValue({
+      data: undefined, isLoading: true, isError: false, error: null, refetch: vi.fn(),
+    });
+    renderPage();
+    expect(screen.getByRole('status')).toBeInTheDocument();
+  });
+
+  it('shows enterprise gate in erasure log for license_required error', () => {
+    // Use real ApiError so isLicenseRequired() instanceof check passes.
+    const err = new ApiError(402, 'enterprise license required', {
+      error: { type: 'license_required', feature: 'compliance' },
+    });
+    mockErasureLog.mockReturnValue({
+      data: undefined, isLoading: false, isError: true, error: err, refetch: vi.fn(),
+    });
+    renderPage();
+    expect(screen.getByText('Enterprise feature')).toBeInTheDocument();
+  });
+
+  it('shows error state in erasure log for generic error with retry', () => {
+    const refetch = vi.fn();
+    mockErasureLog.mockReturnValue({
+      data: undefined, isLoading: false, isError: true, error: new Error('network'), refetch,
+    });
+    renderPage();
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /retry/i }));
+    expect(refetch).toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ExportsCard — error states
+// ---------------------------------------------------------------------------
+
+describe('CompliancePage — ExportsCard error states', () => {
+  it('shows error state when AI Act export fails with a non-license error', async () => {
+    const { api: mockApi } = await import('../../api/client');
+    (mockApi.getAiActTechnicalDoc as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      new Error('network error'),
+    );
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: /AI Act/i }));
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+    });
   });
 });
