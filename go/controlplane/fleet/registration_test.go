@@ -284,3 +284,65 @@ func TestRegistration_HeartbeatUpdatesRegistryAndMetrics(t *testing.T) {
 		}
 	}
 }
+
+// --- LiveMetrics TTL tests --------------------------------------------------
+
+// TestLiveMetrics_FreshSample verifies that a recently-updated entry is
+// returned by Get.
+func TestLiveMetrics_FreshSample(t *testing.T) {
+	now := time.Date(2026, 9, 13, 12, 0, 0, 0, time.UTC)
+	clock := func() time.Time { return now }
+	lm := fleet.NewLiveMetricsWithClock(30*time.Second, clock)
+
+	lm.Update("n1", "NODE_STATE_RUNNING", &purserv1.EngineMetrics{DecodeTokS: 10.0}, nil, now)
+
+	m, ok := lm.Get("n1")
+	if !ok {
+		t.Fatal("fresh sample must be returned ok=true")
+	}
+	if m.DecodeTps != 10.0 {
+		t.Errorf("decode_tok_s = %v, want 10.0", m.DecodeTps)
+	}
+}
+
+// TestLiveMetrics_StaleSampleIsAbsent verifies that a sample older than the
+// TTL is treated as absent: Get returns ok=false so the caller can zero-fill.
+// This test FAILS on the un-fixed LiveMetrics (no TTL) and passes after the fix.
+func TestLiveMetrics_StaleSampleIsAbsent(t *testing.T) {
+	now := time.Date(2026, 9, 13, 12, 0, 0, 0, time.UTC)
+	clock := func() time.Time { return now }
+	lm := fleet.NewLiveMetricsWithClock(30*time.Second, clock)
+
+	lm.Update("n-stale", "NODE_STATE_RUNNING", &purserv1.EngineMetrics{DecodeTokS: 43.0}, nil, now)
+
+	// Sanity: fresh before TTL expires.
+	if _, ok := lm.Get("n-stale"); !ok {
+		t.Fatal("sample must be present right after update")
+	}
+
+	// Advance clock beyond the TTL.
+	now = now.Add(31 * time.Second)
+
+	_, ok := lm.Get("n-stale")
+	if ok {
+		t.Error("stale sample must return ok=false; old decode_tok_s (43.0) must not be visible")
+	}
+}
+
+// TestLiveMetrics_SampleAtExactTTLBoundary verifies edge-case: a sample
+// updated exactly at the TTL boundary is still considered stale (exclusive).
+func TestLiveMetrics_SampleAtExactTTLBoundary(t *testing.T) {
+	now := time.Date(2026, 9, 13, 12, 0, 0, 0, time.UTC)
+	clock := func() time.Time { return now }
+	lm := fleet.NewLiveMetricsWithClock(30*time.Second, clock)
+
+	lm.Update("n-edge", "NODE_STATE_RUNNING", nil, nil, now)
+
+	// Advance clock to exactly the TTL.
+	now = now.Add(30 * time.Second)
+
+	_, ok := lm.Get("n-edge")
+	if ok {
+		t.Error("sample at exactly TTL boundary must be treated as stale (exclusive)")
+	}
+}

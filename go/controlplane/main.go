@@ -701,6 +701,7 @@ func run(logger *slog.Logger) error {
 		Logger:          logger,
 		Deployer:        orch,
 		Metrics:         regServer.Metrics(),
+		NodeMetrics:     regServer.Metrics(),
 		Planner:         planning.New(reg),
 		Fleet:           mgr,
 		ClusterID:       cfg.clusterID,

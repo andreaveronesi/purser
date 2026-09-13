@@ -281,10 +281,20 @@ Each SSE frame is a single `data:` line containing a JSON object:
 | `nodes[].metrics.queue_depth` | Inference requests in the engine queue. |
 | `nodes[].metrics.accepted_tokens_ratio` | Speculative-decoding acceptance ratio (0–1). |
 
-!!! note "Nodes with no heartbeat"
-    Nodes that have not yet reported metrics are included in the frame with all metric fields
-    set to `0.0`. This ensures the node array is always complete — missing nodes indicate
-    a configuration problem, not a reporting gap.
+!!! note "Node enumeration and zero-fill"
+    The stream always reflects exactly the nodes currently registered in the control plane.
+
+    - **Removed nodes** — nodes that have been decommissioned or deleted from the registry
+      no longer appear in the stream, even if the cache still holds a last-known sample.
+    - **Silent nodes** — nodes that are registered but have not recently reported a heartbeat
+      are included in the frame with all metric fields set to `0.0`. A sample is considered
+      stale after **30 seconds** without a heartbeat; stale nodes are zero-filled rather than
+      showing outdated throughput values.
+    - **Never-reported nodes** — nodes that joined the cluster but have not yet sent any
+      heartbeat are also zero-filled.
+
+    This guarantees the node array is always complete and honest — a `decode_tok_s` value
+    of `0.0` means "this node is not processing tokens right now", not a data gap.
 
 #### Example curl session
 
