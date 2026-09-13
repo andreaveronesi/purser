@@ -495,7 +495,15 @@ export function NodePoolsPage() {
         )}
 
         {!isLoading && !isError && pools.length === 0 && (
-          <EmptyState icon={<IconServer />} message={t('platform.pools.noPools')} />
+          <EmptyState
+            icon={<IconServer />}
+            message={t('platform.pools.noPools')}
+            action={
+              <Button variant="primary" size="sm" onClick={() => setShowCreate(true)}>
+                {t('platform.pools.emptyCta')}
+              </Button>
+            }
+          />
         )}
 
         {pools.length > 0 && (

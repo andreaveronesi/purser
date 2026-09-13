@@ -1,6 +1,6 @@
 # Node Pools
 
-Node pools let you partition your GPU fleet into named groups and control which teams can schedule deployments onto which nodes. Without a pool, every team sees every node — exactly the v0.3 behaviour. Pools add enforcement at the planning layer: the planner only considers nodes the requesting team is allowed to use.
+Node pools are an **opt-in** grouping created by a platform admin — a fresh install has zero pools, and that is normal. Node pools let you partition your GPU fleet into named groups and control which teams can schedule deployments onto which nodes. Without a pool, every team sees every node — exactly the v0.3 behaviour. Pools add enforcement at the planning layer: the planner only considers nodes the requesting team is allowed to use.
 
 ---
 

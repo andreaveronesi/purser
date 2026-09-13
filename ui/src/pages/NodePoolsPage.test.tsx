@@ -109,3 +109,33 @@ describe('NodePoolsPage — existing behaviour intact', () => {
     expect(screen.getAllByText('platform.pools.createPool').length).toBeGreaterThan(0);
   });
 });
+
+describe('NodePoolsPage — empty state', () => {
+  beforeEach(() => {
+    // Override default (1-pool) mock with zero pools.
+    mq.useNodePools.mockReturnValue({
+      data: { pools: [] },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+  });
+
+  it('shows the explanatory noPools message when no pools exist', () => {
+    render(<NodePoolsPage />);
+    // The explanatory i18n key must be rendered.
+    expect(screen.getByText('platform.pools.noPools')).toBeInTheDocument();
+  });
+
+  it('renders an emptyCta button inside the empty state that opens the create-pool modal', () => {
+    render(<NodePoolsPage />);
+    // The CTA must use the platform.pools.emptyCta i18n key — not just the header button.
+    const cta = screen.getByRole('button', { name: 'platform.pools.emptyCta' });
+    expect(cta).toBeInTheDocument();
+
+    // Clicking it opens the create-pool modal (dialog appears).
+    fireEvent.click(cta);
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+});
