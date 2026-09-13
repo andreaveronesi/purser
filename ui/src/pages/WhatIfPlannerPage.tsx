@@ -109,22 +109,61 @@ function VirtualNodeRow({ index, node, onChange, onRemove, t }: VirtualNodeRowPr
 // ---------------------------------------------------------------------------
 
 function ResultPanel({ result, t }: { result: WhatIfResult; t: ReturnType<typeof useT> }) {
-  const feasibleTone: Tone = result.feasible ? 'success' : 'danger';
+  const simulatedTone: Tone = result.feasible ? 'success' : 'danger';
+  const currentTone: Tone | undefined =
+    result.currentPlan !== undefined
+      ? result.currentPlan.feasible
+        ? 'success'
+        : 'danger'
+      : undefined;
+
+  // When virtual nodes are added but the simulated plan is still infeasible while
+  // the current fleet is already feasible — make that contrast explicit.
+  const showNoImprovement =
+    result.feasible === false && result.currentPlan?.feasible === true;
 
   return (
     <Card title="Simulation result">
-      <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginBottom: '1rem' }}>
-        <Badge tone={feasibleTone} data-testid="whatif-feasible-badge">
-          {result.feasible ? t('planner.whatIf.result.feasible') : t('planner.whatIf.result.infeasible')}
-        </Badge>
-        {result.currentPlan !== undefined && (
-          <span className="muted">
-            {t('planner.whatIf.result.currentPlan', {
-              status: result.currentPlan.feasible
-                ? t('planner.whatIf.result.feasible')
-                : t('planner.whatIf.result.infeasible'),
-            })}
+      {/* Comparative block — two clearly-labelled scenario rows */}
+      <div
+        style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '1rem' }}
+      >
+        {/* Row 1: result WITH virtual nodes */}
+        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+          <span className="muted" style={{ minWidth: '13rem' }}>
+            {t('planner.whatIf.result.withSimulated')}
           </span>
+          {/* Wrapper span carries the testid because Badge doesn't accept arbitrary props */}
+          <span data-testid="whatif-simulated-badge">
+            <Badge tone={simulatedTone}>
+              {result.feasible
+                ? t('planner.whatIf.result.feasible')
+                : t('planner.whatIf.result.infeasible')}
+            </Badge>
+          </span>
+        </div>
+
+        {/* Row 2: current fleet WITHOUT virtual nodes (only when backend returns it) */}
+        {result.currentPlan !== undefined && (
+          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+            <span className="muted" style={{ minWidth: '13rem' }}>
+              {t('planner.whatIf.result.currentFleet')}
+            </span>
+            <span data-testid="whatif-current-badge">
+              <Badge tone={currentTone!}>
+                {result.currentPlan.feasible
+                  ? t('planner.whatIf.result.feasible')
+                  : t('planner.whatIf.result.infeasible')}
+              </Badge>
+            </span>
+          </div>
+        )}
+
+        {/* Explanatory note: virtual nodes didn't help vs the already-feasible fleet */}
+        {showNoImprovement && (
+          <p className="muted" style={{ marginTop: '0.25rem', marginBottom: 0 }}>
+            {t('planner.whatIf.result.noImprovement')}
+          </p>
         )}
       </div>
 

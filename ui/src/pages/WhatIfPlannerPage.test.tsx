@@ -264,12 +264,15 @@ describe('WhatIfPlannerPage', () => {
     expect(deltaEl.textContent).toContain('"delta":"35"');
   });
 
-  it('shows currentPlan context note when currentPlan is present', () => {
+  it('shows currentFleet row when currentPlan is present', () => {
     mockUseWhatIfPlan.mockReturnValue(successMutation(feasibleResult));
     renderPage();
 
-    // currentPlan.feasible=false → shows infeasible status
-    expect(screen.getByText(/planner\.whatIf\.result\.currentPlan/)).toBeInTheDocument();
+    // feasibleResult has currentPlan: { feasible: false } → fleet-attuale row is rendered
+    expect(screen.getByText('planner.whatIf.result.currentFleet')).toBeInTheDocument();
+    // badge on the current-fleet row reflects currentPlan.feasible=false
+    const currentBadge = screen.getByTestId('whatif-current-badge');
+    expect(currentBadge.textContent).toContain('planner.whatIf.result.infeasible');
   });
 
   it('shows assignments table with camelCase node/layer fields', () => {

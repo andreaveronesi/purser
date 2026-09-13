@@ -202,3 +202,21 @@ you the expected throughput envelope to compare against your SLA requirements.
 A `200 OK` with `"feasible": false` is **not** an error — it means the hypothetical fleet
 still cannot hold the model. Check `current_plan.deficit_vram_gb` to see how much more
 capacity is needed.
+
+---
+
+## Reading the UI result panel
+
+The dashboard **What-if Planner** page shows the simulation result as two clearly-labelled
+rows so you can compare the scenarios at a glance:
+
+| Row | What it means |
+|---|---|
+| **With simulated nodes** | Feasibility of deploying the model on your virtual fleet (existing nodes + the virtual nodes you specified). |
+| **Current fleet (no simulation)** | Feasibility on your real fleet today, without any virtual nodes. Only shown when `include_existing_nodes: true` was used. |
+
+If the **With simulated nodes** row is **Infeasible** but the **Current fleet** row is
+**Feasible**, an explanatory note is shown: *"The simulated virtual nodes do not improve
+feasibility compared to the current fleet."* This can happen when the virtual nodes you
+added create a topology that the planner cannot accommodate — try adjusting VRAM or
+bandwidth and re-run the simulation.
