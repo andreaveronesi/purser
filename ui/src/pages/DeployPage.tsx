@@ -89,12 +89,15 @@ function PlanView({
   plan,
   names,
   t,
+  engine,
 }: {
   plan: DeploymentPlan;
   names: Record<string, string>;
   t: TFunc;
+  engine?: string;
 }) {
   const e = plan.estimated;
+  const isMock = engine === 'mock';
   return (
     <>
       <WhyPlanCard explanation={plan.explanation} t={t} />
@@ -111,7 +114,18 @@ function PlanView({
           <dl className="perf">
             <div>
               <dt>{t('deploy.plan.decode')}</dt>
-              <dd>{range(e.decodeTokSMin, e.decodeTokSMax, 'tok/s')}</dd>
+              <dd>
+                {range(e.decodeTokSMin, e.decodeTokSMax, 'tok/s')}
+                {isMock && (
+                  <span
+                    className="muted"
+                    data-testid="deploy-mock-disclaimer"
+                    style={{ marginLeft: '0.4em', fontSize: '0.85em' }}
+                  >
+                    {t('deploy.mock.disclaimer')}
+                  </span>
+                )}
+              </dd>
             </div>
             <div>
               <dt>{t('deploy.plan.prefill')}</dt>
@@ -310,7 +324,7 @@ export function DeployPage() {
               onRetry={() => preview.refetch()}
             />
           )}
-          {!launchedId && preview.data && <PlanView plan={preview.data} names={names} t={t} />}
+          {!launchedId && preview.data && <PlanView plan={preview.data} names={names} t={t} engine={model.data?.engine} />}
 
           {launchedId && <RolloutView id={launchedId} t={t} />}
         </>

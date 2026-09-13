@@ -768,7 +768,8 @@ function NodeRow({
           {isRetired && (
             <span
               className="muted"
-              style={{ marginLeft: '0.4rem', fontSize: '0.75rem' }}
+              title={t('fleet.node.retired.hint')}
+              style={{ marginLeft: '0.4rem', fontSize: '0.75rem', cursor: 'help' }}
             >
               {t('fleet.node.retired')}
             </span>
@@ -911,6 +912,36 @@ export function FleetPage() {
       {capacity.data && (
         <CapacityCard cap={capacity.data} liveDecodeTokS={live?.aggregateDecodeTokS} t={t} />
       )}
+
+      {/* Idle anchor: nodes are ready but nothing is running. Guide the operator. */}
+      {capacity.data &&
+        capacity.data.readyNodeCount > 0 &&
+        (live?.aggregateDecodeTokS ?? capacity.data.aggregateDecodeTokS) === 0 && (
+          <div
+            data-testid="fleet-idle-banner"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+              background: 'var(--info-bg)',
+              border: '1px solid color-mix(in srgb, var(--info-fg) 25%, transparent)',
+              borderRadius: 'var(--radius)',
+              padding: '12px 16px',
+              fontSize: '0.9em',
+            }}
+          >
+            <span aria-hidden="true" style={{ color: 'var(--info-fg)', fontSize: '1.1em' }}>ℹ</span>
+            <span style={{ color: 'var(--text)' }}>
+              {t('fleet.idle.banner')}{' '}
+              <Link
+                to="/catalog"
+                style={{ color: 'var(--info-fg)', fontWeight: 600, textDecoration: 'none', borderBottom: '1px solid color-mix(in srgb, var(--info-fg) 40%, transparent)' }}
+              >
+                {t('fleet.idle.link')}
+              </Link>
+            </span>
+          </div>
+        )}
 
       {/* P-12: Reconciler card is always rendered (never conditionally hidden).
           - isLoading: render nothing until the first response (TODO: skeleton)

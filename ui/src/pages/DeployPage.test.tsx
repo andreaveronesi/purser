@@ -376,3 +376,43 @@ describe('DeployPage', () => {
     expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
   });
 });
+
+// ---------------------------------------------------------------------------
+// 6c — mock engine disclaimer (usability pass)
+// ---------------------------------------------------------------------------
+
+describe('DeployPage — mock engine disclaimer', () => {
+  it('shows mock disclaimer on the perf card when model engine is "mock"', () => {
+    defaultHooks();
+    // Override catalog and model to use mock engine
+    const mockModel: ModelSpec = { ...modelSpec, engine: 'mock' };
+    vi.mocked(useCatalog).mockReturnValue({
+      data: [{ model: mockModel, fit: fitVerdict }],
+      isLoading: false, isError: false, error: null, refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useCatalog>);
+    vi.mocked(useModel).mockReturnValue({
+      data: mockModel,
+      isLoading: false, isError: false, error: null, refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useModel>);
+    vi.mocked(usePlanPreview).mockReturnValue({
+      data: plan, isLoading: false, isError: false, error: null, refetch: vi.fn(),
+    } as unknown as ReturnType<typeof usePlanPreview>);
+
+    renderPage();
+
+    // Disclaimer is shown next to the decode estimate
+    expect(screen.getByTestId('deploy-mock-disclaimer')).toBeInTheDocument();
+  });
+
+  it('does not show mock disclaimer when model engine is real', () => {
+    defaultHooks();
+    vi.mocked(usePlanPreview).mockReturnValue({
+      data: plan, isLoading: false, isError: false, error: null, refetch: vi.fn(),
+    } as unknown as ReturnType<typeof usePlanPreview>);
+
+    renderPage();
+
+    // modelSpec uses engine: 'llama.cpp' → no disclaimer
+    expect(screen.queryByTestId('deploy-mock-disclaimer')).not.toBeInTheDocument();
+  });
+});

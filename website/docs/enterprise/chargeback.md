@@ -19,6 +19,11 @@ The **quick summary** endpoint (`/billing/summary`) is **not** enterprise-gated 
 is used by the Settings-page stats bar. The **full report** (`/billing/report`) and
 the **ChargebackPage** in the UI require the `billing` feature in the active license.
 
+When the `billing` feature is absent from the active license, the ChargebackPage
+shows an **enterprise gate** — a lock icon with a one-line description of what
+chargeback does and a link to the Enterprise licensing docs. This is the same gate
+pattern used by the Compliance, Policies, and Audit Log pages.
+
 ---
 
 ## Enabling chargeback

@@ -116,6 +116,9 @@ export const it: Record<StringKey, string> = {
   'fleet.metrics.stale': 'Metriche live non disponibili — mostrati ultimi valori noti',
   'fleet.nodes.readyOf': '{ready} di {total} pronti',
   'fleet.node.retired': 'Ritirato',
+  'fleet.node.retired.hint': 'Questo nodo è stato dismesso e non riceverà più nuovi compiti. Rimuovilo dalla flotta se non è più necessario.',
+  'fleet.idle.banner': "Nessuna inferenza in corso. Deploya un modello dal Catalogo per vedere metriche live.",
+  'fleet.idle.link': 'Vai al Catalogo',
 
   // widget stato reconciler
   'fleet.reconciler.title': 'Reconciler',
@@ -161,6 +164,7 @@ export const it: Record<StringKey, string> = {
   'catalog.preview.pipeline': 'Ordine pipeline',
   'catalog.preview.deploy': 'Deploy',
   'catalog.preview.infeasible': 'Non può essere deployato su questa flotta',
+  'catalog.mock.disclaimer': '(stima motore mock, non hardware reale)',
 
   'deploy.title': 'Deploy: {model}',
   'deploy.plan.title': 'Il piano',
@@ -172,6 +176,7 @@ export const it: Record<StringKey, string> = {
   'deploy.plan.prefill': 'Prefill',
   'deploy.plan.headroom': 'Margine di memoria',
   'deploy.perf.rangeNote': 'Mostrata come range onesto — il throughput reale varia con latenza di rete e carico.',
+  'deploy.mock.disclaimer': '(stima motore mock, non hardware reale)',
   'deploy.overrides.title': 'Override',
   'deploy.overrides.nodes': 'Forza numero di nodi',
   'deploy.overrides.auto': 'Auto ({n})',
@@ -528,6 +533,9 @@ export const it: Record<StringKey, string> = {
   'chargeback.title': 'Addebiti',
   'chargeback.subtitle': "Consumo token e numero di richieste per team e modello.",
   'chargeback.enterprise.required': 'Licenza enterprise richiesta per i report di addebito.',
+  'chargeback.enterprise.title': 'Funzionalità Enterprise',
+  'chargeback.enterprise.desc': 'Chargeback alloca i costi di inferenza e il consumo di token per team — FinOps enterprise per la tua flotta LLM. Attiva la responsabilità sui costi in tutta la tua organizzazione.',
+  'chargeback.enterprise.link': 'Scopri Purser Enterprise →',
   'chargeback.period.label': 'Periodo',
   'chargeback.empty': 'Nessun utilizzo registrato in questo periodo.',
   'chargeback.action.exportCsv': 'Esporta CSV',

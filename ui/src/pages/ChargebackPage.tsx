@@ -43,6 +43,66 @@ import type {
 } from '../api/types';
 
 // ---------------------------------------------------------------------------
+// Enterprise license gate detection (same idiom as CompliancePage / PoliciesPage)
+// ---------------------------------------------------------------------------
+
+function isLicenseRequired(error: unknown): boolean {
+  if (!(error instanceof ApiError)) return false;
+  const body = error.body as Record<string, unknown> | null | undefined;
+  if (!body || typeof body !== 'object') return false;
+  const errField = body.error as Record<string, unknown> | null | undefined;
+  if (!errField || typeof errField !== 'object') return false;
+  return errField.type === 'license_required';
+}
+
+function EnterpriseGate() {
+  const t = useT();
+  return (
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'flex-start',
+        gap: '10px',
+        background: 'var(--info-bg)',
+        border: '1px solid color-mix(in srgb, var(--info-fg) 25%, transparent)',
+        borderRadius: 'var(--radius)',
+        padding: '20px 24px',
+      }}
+      role="status"
+      data-testid="enterprise-gate"
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <span aria-hidden="true" style={{ fontSize: '1.25em', lineHeight: 1, color: 'var(--info-fg)' }}>
+          🔒
+        </span>
+        <strong style={{ color: 'var(--info-fg)', fontSize: '1em', fontWeight: 600 }}>
+          {t('chargeback.enterprise.title')}
+        </strong>
+      </div>
+      <p style={{ margin: 0, color: 'var(--text)', fontSize: '0.9em', lineHeight: 1.5 }}>
+        {t('chargeback.enterprise.desc')}
+      </p>
+      <a
+        href="https://andrew19881123.github.io/purser/enterprise/licensing/"
+        target="_blank"
+        rel="noreferrer"
+        style={{
+          color: 'var(--info-fg)',
+          fontWeight: 600,
+          fontSize: '0.875em',
+          textDecoration: 'none',
+          borderBottom: '1px solid color-mix(in srgb, var(--info-fg) 40%, transparent)',
+          paddingBottom: '1px',
+        }}
+      >
+        {t('chargeback.enterprise.link')}
+      </a>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Period picker
 // ---------------------------------------------------------------------------
 
@@ -575,15 +635,15 @@ export function ChargebackPage() {
     setTimeout(() => setDownloadingPdf(false), 1500);
   }
 
-  // Enterprise gate: 402 → show upgrade prompt.
-  if (error instanceof ApiError && error.status === 402) {
+  // Enterprise gate: 402 → show upgrade prompt (consistent with AuditPage/CompliancePage/PoliciesPage).
+  if (isLicenseRequired(error)) {
     return (
       <div className="page">
         <PageHeader
           title={t('chargeback.title')}
           subtitle={t('chargeback.subtitle')}
         />
-        <EmptyState message={t('chargeback.enterprise.required')} />
+        <EnterpriseGate />
       </div>
     );
   }

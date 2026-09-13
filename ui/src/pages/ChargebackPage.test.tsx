@@ -210,19 +210,39 @@ describe('ChargebackPage — SLA compliance tab', () => {
 // ---------------------------------------------------------------------------
 
 describe('ChargebackPage — enterprise gate (page-level 402)', () => {
-  it('shows the enterprise empty state instead of the page when useBillingReport returns 402', () => {
-    mq.useBillingReport.mockReturnValue({
-      data: undefined,
-      isLoading: false,
-      error: new ApiError(402, 'enterprise license required', {
-        error: { type: 'license_required', feature: 'billing' },
-      }),
+  function make402Error() {
+    return new ApiError(402, 'enterprise license required', {
+      error: { type: 'license_required', feature: 'billing' },
     });
+  }
+
+  it('shows the EnterpriseGate (not a bare EmptyState) when useBillingReport returns 402', () => {
+    mq.useBillingReport.mockReturnValue({ data: undefined, isLoading: false, error: make402Error() });
     renderPage();
-    // The enterprise gate renders the EmptyState message
-    expect(screen.getByText('chargeback.enterprise.required')).toBeInTheDocument();
+    // EnterpriseGate renders with data-testid and role=status
+    expect(screen.getByTestId('enterprise-gate')).toBeInTheDocument();
     // The tabs should NOT be rendered
     expect(screen.queryByRole('tab', { name: 'chargeback.tab.usage' })).not.toBeInTheDocument();
+  });
+
+  it('EnterpriseGate shows lock icon, title, and description on 402', () => {
+    mq.useBillingReport.mockReturnValue({ data: undefined, isLoading: false, error: make402Error() });
+    renderPage();
+    const gate = screen.getByTestId('enterprise-gate');
+    // Lock emoji is present
+    expect(gate.textContent).toContain('🔒');
+    // Title and description keys rendered by the mock t()
+    expect(screen.getByText('chargeback.enterprise.title')).toBeInTheDocument();
+    expect(screen.getByText('chargeback.enterprise.desc')).toBeInTheDocument();
+  });
+
+  it('EnterpriseGate docs link points to the same host as other enterprise pages', () => {
+    mq.useBillingReport.mockReturnValue({ data: undefined, isLoading: false, error: make402Error() });
+    renderPage();
+    const link = screen.getByText('chargeback.enterprise.link').closest('a');
+    expect(link).not.toBeNull();
+    // Same docs host as CompliancePage / PoliciesPage
+    expect(link?.href).toContain('andrew19881123.github.io/purser');
   });
 });
 

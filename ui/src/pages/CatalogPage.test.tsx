@@ -410,3 +410,43 @@ describe('CatalogPage', () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// 6c — mock engine disclaimer (usability pass)
+// ---------------------------------------------------------------------------
+
+describe('CatalogPage — mock engine disclaimer', () => {
+  it('shows mock disclaimer when model engine is "mock" and model fits', async () => {
+    const mockEngineEntry: CatalogEntry = {
+      ...feasibleEntry,
+      model: { ...feasibleEntry.model, engine: 'mock' },
+    };
+    vi.mocked(api.getCatalog).mockResolvedValue([mockEngineEntry]);
+    renderPage();
+    await waitFor(() => expect(screen.getByText('Llama 3.1 8B')).toBeInTheDocument());
+    // Disclaimer is visible on the fit badge
+    expect(screen.getByTestId('mock-disclaimer')).toBeInTheDocument();
+  });
+
+  it('does not show mock disclaimer when model engine is real (e.g. llama.cpp)', async () => {
+    const realEngineEntry: CatalogEntry = {
+      ...feasibleEntry,
+      model: { ...feasibleEntry.model, engine: 'llama.cpp' },
+    };
+    vi.mocked(api.getCatalog).mockResolvedValue([realEngineEntry]);
+    renderPage();
+    await waitFor(() => expect(screen.getByText('Llama 3.1 8B')).toBeInTheDocument());
+    expect(screen.queryByTestId('mock-disclaimer')).not.toBeInTheDocument();
+  });
+
+  it('does not show mock disclaimer when model does not fit (no estimated throughput)', async () => {
+    const mockInfeasibleEntry: CatalogEntry = {
+      ...infeasibleEntry,
+      model: { ...infeasibleEntry.model, engine: 'mock' },
+    };
+    vi.mocked(api.getCatalog).mockResolvedValue([mockInfeasibleEntry]);
+    renderPage();
+    await waitFor(() => expect(screen.getByText('Llama 70B')).toBeInTheDocument());
+    expect(screen.queryByTestId('mock-disclaimer')).not.toBeInTheDocument();
+  });
+});

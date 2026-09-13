@@ -393,3 +393,54 @@ describe('FleetPage — NodeRow restart action', () => {
     expect(screen.getByText('fleet.role.worker')).toBeInTheDocument();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Idle anchor banner (6b) — no inference running
+// ---------------------------------------------------------------------------
+
+describe('FleetPage — idle anchor banner', () => {
+  it('shows the idle banner when nodes are ready and aggregate decode is 0', () => {
+    // Ready nodes, zero aggregate decode (no inference running)
+    mockCapacity = {
+      ...mockCapacity,
+      data: makeCapacity({ readyNodeCount: 2, aggregateDecodeTokS: 0 }),
+    };
+    mockStream = { snapshot: null, streamError: false };
+    render(<FleetPage />, { wrapper: Wrapper });
+    expect(screen.getByTestId('fleet-idle-banner')).toBeInTheDocument();
+    // Banner text uses i18n key (mock returns key verbatim)
+    expect(screen.getByText(/fleet.idle.banner/)).toBeInTheDocument();
+    // Link to catalog is present
+    expect(screen.getByText('fleet.idle.link')).toBeInTheDocument();
+  });
+
+  it('does not show the idle banner when there is live decode traffic', () => {
+    mockCapacity = {
+      ...mockCapacity,
+      data: makeCapacity({ readyNodeCount: 2, aggregateDecodeTokS: 0 }),
+    };
+    // Live SSE stream overrides with non-zero aggregate
+    mockStream = {
+      snapshot: { aggregateDecodeTokS: 1500, nodes: [] },
+      streamError: false,
+    };
+    render(<FleetPage />, { wrapper: Wrapper });
+    expect(screen.queryByTestId('fleet-idle-banner')).not.toBeInTheDocument();
+  });
+
+  it('does not show the idle banner when readyNodeCount is 0', () => {
+    mockCapacity = {
+      ...mockCapacity,
+      data: makeCapacity({ readyNodeCount: 0, aggregateDecodeTokS: 0 }),
+    };
+    mockStream = { snapshot: null, streamError: false };
+    render(<FleetPage />, { wrapper: Wrapper });
+    expect(screen.queryByTestId('fleet-idle-banner')).not.toBeInTheDocument();
+  });
+
+  it('does not show the idle banner when capacity data is not loaded', () => {
+    mockCapacity = { ...mockCapacity, data: null };
+    render(<FleetPage />, { wrapper: Wrapper });
+    expect(screen.queryByTestId('fleet-idle-banner')).not.toBeInTheDocument();
+  });
+});

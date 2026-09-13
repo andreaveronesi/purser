@@ -122,6 +122,9 @@ export const en = {
   'fleet.metrics.stale': 'Live metrics unavailable — showing last known values',
   'fleet.nodes.readyOf': '{ready} of {total} ready',
   'fleet.node.retired': 'Retired',
+  'fleet.node.retired.hint': 'This node has been decommissioned and will no longer receive new work. Remove it from the fleet if no longer needed.',
+  'fleet.idle.banner': 'No inference running. Deploy a model from the Catalog to see live metrics.',
+  'fleet.idle.link': 'Go to Catalog',
 
   // reconciler status widget
   'fleet.reconciler.title': 'Reconciler',
@@ -169,6 +172,7 @@ export const en = {
   'catalog.preview.pipeline': 'Pipeline order',
   'catalog.preview.deploy': 'Deploy',
   'catalog.preview.infeasible': 'Cannot be deployed on this fleet',
+  'catalog.mock.disclaimer': '(mock engine estimate, not real hardware)',
 
   // deploy
   'deploy.title': 'Deploy: {model}',
@@ -181,6 +185,7 @@ export const en = {
   'deploy.plan.prefill': 'Prefill',
   'deploy.plan.headroom': 'Memory headroom',
   'deploy.perf.rangeNote': 'Shown as an honest range — real throughput moves with link latency and load.',
+  'deploy.mock.disclaimer': '(mock engine estimate, not real hardware)',
   'deploy.overrides.title': 'Overrides',
   'deploy.overrides.nodes': 'Force node count',
   'deploy.overrides.auto': 'Auto ({n})',
@@ -440,6 +445,9 @@ export const en = {
   'chargeback.title': 'Chargeback',
   'chargeback.subtitle': 'Token usage and request counts by team and model.',
   'chargeback.enterprise.required': 'Enterprise license required for chargeback reports.',
+  'chargeback.enterprise.title': 'Enterprise feature',
+  'chargeback.enterprise.desc': 'Chargeback allocates inference costs and token usage per team — enterprise FinOps for your LLM fleet. Enable cost accountability across your organization.',
+  'chargeback.enterprise.link': 'Learn about Purser Enterprise →',
   'chargeback.period.label': 'Period',
   'chargeback.empty': 'No usage recorded in this period.',
   'chargeback.action.exportCsv': 'Export CSV',
