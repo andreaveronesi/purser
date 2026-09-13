@@ -10,6 +10,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { OrganizationsPage } from './OrganizationsPage';
+import { MockAuthProvider } from '../test/auth-helpers';
 import type { Organization } from '../api/types';
 
 vi.mock('../i18n', () => ({
@@ -360,5 +361,49 @@ describe('OrganizationsPage — delete org (confirm-first)', () => {
     // After cancelling, the action.cancel button should be gone
     expect(screen.queryByRole('button', { name: 'action.cancel' })).toBeNull();
     expect(deleteOrgMutateAsync).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// RBAC: 'Create org' button gating on isPlatformAdmin
+// ---------------------------------------------------------------------------
+
+describe('OrganizationsPage — RBAC: create org button', () => {
+  function renderPageWithAuth(authProps: Parameters<typeof MockAuthProvider>[0]) {
+    return render(
+      <MockAuthProvider {...authProps}>
+        <MemoryRouter initialEntries={['/platform/orgs']}>
+          <Routes>
+            <Route path="/platform/orgs" element={<OrganizationsPage />} />
+          </Routes>
+        </MemoryRouter>
+      </MockAuthProvider>,
+    );
+  }
+
+  it('hides Create Org button (header) for a viewer (non-admin)', () => {
+    mq.useOrganizations.mockReturnValue(orgsSuccess([]));
+    renderPageWithAuth({
+      isDevMode: false,
+      isAuthenticated: true,
+      user: { actor: 'viewer', email: 'v@example.com', role: 'viewer', isPlatformAdmin: false, isOrgAdmin: false, orgs: [], teams: [] },
+    });
+    expect(screen.queryByRole('button', { name: 'platform.orgs.createOrg' })).toBeNull();
+  });
+
+  it('shows Create Org button (header) for platform_admin', () => {
+    mq.useOrganizations.mockReturnValue(orgsSuccess([]));
+    renderPageWithAuth({
+      isDevMode: false,
+      isAuthenticated: true,
+      user: { actor: 'admin', email: 'a@example.com', role: 'platform_admin', isPlatformAdmin: true, isOrgAdmin: false, orgs: [], teams: [] },
+    });
+    expect(screen.getByRole('button', { name: 'platform.orgs.createOrg' })).toBeDefined();
+  });
+
+  it('shows Create Org button in dev-mode', () => {
+    mq.useOrganizations.mockReturnValue(orgsSuccess([]));
+    renderPageWithAuth({ isDevMode: true, isAuthenticated: true, user: null });
+    expect(screen.getByRole('button', { name: 'platform.orgs.createOrg' })).toBeDefined();
   });
 });
