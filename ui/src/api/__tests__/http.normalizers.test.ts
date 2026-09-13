@@ -11,7 +11,7 @@
 //   - join-token: { token, cluster_id, expires_at }
 // ---------------------------------------------------------------------------
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createHttpApi } from '../http';
+import { createHttpApi, usableUrl } from '../http';
 
 // The base URL is irrelevant — fetch is fully mocked.
 const BASE = '/api/v1';
@@ -380,6 +380,54 @@ describe('getJoinInfo — real /join-token shape', () => {
     const info = await api.getJoinInfo();
     expect(info.controlPlaneUrl).toBe(window.location.origin);
     expect(info.controlPlaneUrl).not.toBe('');
+  });
+
+  // E7 fix: port-only / empty-host URLs must be treated as unusable.
+  // Before the fix, ":8080" was non-empty so it passed through verbatim,
+  // making every install command use a host-less URL like
+  //   curl -fsSL :8080/install/agent.sh | sh
+  it('falls back to window.location.origin when control_plane_url is ":8080" (port-only, no host)', async () => {
+    mockFetch({ ...realJoinTokenResponse, control_plane_url: ':8080' });
+    const info = await api.getJoinInfo();
+    expect(info.controlPlaneUrl).toBe(window.location.origin);
+    expect(info.controlPlaneUrl).not.toBe(':8080');
+  });
+
+  it('falls back to window.location.origin when control_plane_url is "http://:8080" (empty host)', async () => {
+    mockFetch({ ...realJoinTokenResponse, control_plane_url: 'http://:8080' });
+    const info = await api.getJoinInfo();
+    expect(info.controlPlaneUrl).toBe(window.location.origin);
+    expect(info.controlPlaneUrl).not.toBe('http://:8080');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// usableUrl — unit tests for the exported helper
+// ---------------------------------------------------------------------------
+
+describe('usableUrl', () => {
+  it('returns false for empty string', () => {
+    expect(usableUrl('')).toBe(false);
+  });
+
+  it('returns false for ":8080" (port-only, no host)', () => {
+    expect(usableUrl(':8080')).toBe(false);
+  });
+
+  it('returns false for "http://:8080" (empty host)', () => {
+    expect(usableUrl('http://:8080')).toBe(false);
+  });
+
+  it('returns true for a valid URL with host', () => {
+    expect(usableUrl('https://cp.acme.com')).toBe(true);
+  });
+
+  it('returns true for URL with host and port', () => {
+    expect(usableUrl('https://cp.acme.com:8443')).toBe(true);
+  });
+
+  it('returns true for URL with path', () => {
+    expect(usableUrl('http://localhost:3000')).toBe(true);
   });
 });
 

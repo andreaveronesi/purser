@@ -698,6 +698,7 @@ func run(logger *slog.Logger) error {
 	// mode.
 	srvCfg := server.Config{
 		Addr:            cfg.addr,
+		PublicAddr:      envOr("PURSER_PUBLIC_ADDR", ""),
 		Logger:          logger,
 		Deployer:        orch,
 		Metrics:         regServer.Metrics(),

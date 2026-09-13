@@ -215,11 +215,21 @@ Response:
 ```
 
 The `control_plane_url` field contains the address agents should use for
-`PURSER_CONTROL_PLANE_ADDR`.  It is set from the `--public-addr` flag
-(or `PURSER_PUBLIC_ADDR` env var) when configured; otherwise it falls back to
-the listen address.  The Operator Dashboard's **Onboarding** page reads this
-field automatically to pre-fill the install commands — no manual copy-paste of
-the address is needed when the server is configured with a public URL.
+`PURSER_CONTROL_PLANE_ADDR`.  It is set from the `PURSER_PUBLIC_ADDR` env var
+(or the `--public-addr` flag) when configured; otherwise it falls back to the
+bind address (e.g. `:8080`), which is only reachable from the same host.
+
+!!! warning "Set `PURSER_PUBLIC_ADDR` in production"
+    If `control_plane_url` is a host-less bind address like `:8080`, the
+    Operator Dashboard's **Onboarding** page will fall back to the browser
+    origin for the install commands — which works for the local demo but
+    not for agents on other machines.  In production set `PURSER_PUBLIC_ADDR`
+    to the externally-reachable URL (e.g. `https://cp.acme.com:8443`) so the
+    install snippets contain the correct address automatically.
+
+The Operator Dashboard's **Onboarding** page reads `control_plane_url`
+automatically to pre-fill the install commands — no manual copy-paste of the
+address is needed when the server is configured with a public URL.
 
 Copy the `token` value verbatim — it is an opaque signed string with no prefix,
 so any added or missing character invalidates it.

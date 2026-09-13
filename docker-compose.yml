@@ -49,6 +49,13 @@ services:
       PURSER_DB_DRIVER: sqlite
       PURSER_DB: /data/purser-registry.db
       PURSER_ADDR: ":8080"
+      # PUBLIC_ADDR is the externally-reachable base URL agents use in enrollment
+      # commands. In the demo stack everything is proxied through nginx on :3000,
+      # so we use the proxy origin (without any path prefix) because OnboardingPage
+      # appends paths like /install/agent.sh and --control-plane <url> directly.
+      # Using ".../api/v1" here would produce broken URLs like
+      # "http://localhost:3000/api/v1/install/agent.sh".
+      PURSER_PUBLIC_ADDR: "http://localhost:3000"
       PURSER_GRPC_ADDR: ":9443"
       PURSER_PKI_DIR: /data/pki
       PURSER_ENGINE_BACKEND: mock

@@ -654,14 +654,40 @@ function normalizeFit(raw: unknown, model: ModelSpec, deployable: unknown): FitV
   };
 }
 
+/**
+ * Returns true iff `s` is a URL string that has a non-empty hostname and can
+ * be used as the control-plane base URL in enrollment commands.
+ *
+ * Considers the following NOT usable (they all come from an unconfigured server
+ * that falls back to its bind address):
+ *   ""            — empty string
+ *   ":8080"       — port-only, no host (Go bind address)
+ *   "http://:8080" — empty host component
+ *
+ * Exported so tests can verify the predicate in isolation.
+ */
+export function usableUrl(s: string): boolean {
+  if (s === '' || s.startsWith(':')) return false;
+  try {
+    // Use window.location.origin as a base so relative strings don't accidentally
+    // become absolute (they won't have a real host and hostname will be empty).
+    const u = new URL(s, typeof window !== 'undefined' ? window.location.origin : 'http://localhost');
+    return u.hostname !== '';
+  } catch {
+    return false;
+  }
+}
+
 function normalizeJoinInfo(raw: unknown): JoinInfo {
   const j = (raw ?? {}) as Record<string, unknown>;
   // The server includes control_plane_url (→ controlPlaneUrl after camelizeKeys)
   // when it has a configured PublicAddr.  Fall back to the browser origin so
-  // install commands never contain an empty --control-plane argument.
+  // install commands never contain an empty or host-less --control-plane argument.
+  // usableUrl() rejects bind-address strings like ":8080" or "http://:8080" that
+  // the server emits when PURSER_PUBLIC_ADDR is not set.
   const serverUrl = str(j.controlPlaneUrl);
   const controlPlaneUrl =
-    serverUrl !== '' ? serverUrl : (typeof window !== 'undefined' ? window.location.origin : '');
+    usableUrl(serverUrl) ? serverUrl : (typeof window !== 'undefined' ? window.location.origin : '');
   return {
     // API returns "token" in the wire format (camelizeKeys keeps it as "token").
     // Support both "joinToken" (legacy) and "token" (current) for back-compat.
