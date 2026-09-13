@@ -417,7 +417,9 @@ export const it: Record<StringKey, string> = {
   'platform.orgs.name': 'Nome',
   'platform.orgs.slug': 'Slug',
   'platform.orgs.description': 'Descrizione',
-  'platform.orgs.noOrgs': 'Nessuna organizzazione ancora.',
+  'platform.orgs.noOrgsTitle': 'Nessuna organizzazione ancora',
+  'platform.orgs.noOrgs': 'Le organizzazioni raggruppano team, ruoli, quote e fatturazione per unità di business. Ogni org è uno spazio isolato con i propri membri e controlli di accesso.',
+  'platform.orgs.noOrgsCta': 'Crea la prima organizzazione',
   'platform.orgs.delete': 'Elimina',
   'platform.orgs.deleteConfirm': 'Eliminare l\'organizzazione {name}? Questa operazione non può essere annullata.',
   'platform.orgs.viewTeams': 'Vedi Team',
@@ -461,7 +463,7 @@ export const it: Record<StringKey, string> = {
   'platform.pools.assignNode': 'Assegna Nodo',
   'platform.pools.removeNode': 'Rimuovi',
   'platform.pools.noNodes': 'Nessun nodo assegnato.',
-  'platform.pools.noPools': 'Nessun node pool. I pool raggruppano i nodi della fleet per team o scopo, così puoi impostare quote per team. Crea il primo pool per iniziare.',
+  'platform.pools.noPools': 'Un node pool è un gruppo di nodi della fleet riservato a un team o a uno scopo. Non ne hai ancora creati. Creane uno per assegnare nodi e impostare quote per team.',
   'platform.pools.emptyCta': 'Crea il primo pool',
   'platform.pools.col.name': 'Nome',
   'platform.pools.col.owner': 'Proprietario',
@@ -487,7 +489,18 @@ export const it: Record<StringKey, string> = {
   'platform.pools.deleteHasNodes': 'Rimuovi tutti i nodi assegnati prima di eliminare questo pool.',
   'error.pools': 'Impossibile caricare i pool di nodi.',
 
+  // --- utenti piattaforma (W1) -----------------------------------------------
+  'platform.users.noUsers': 'Nessun utente ancora. Gli utenti compaiono qui dopo il primo login via OIDC o LDAP.',
+  'platform.users.noUsersFiltered': 'Nessun utente in questa organizzazione. Prova a rimuovere il filtro.',
+  'platform.users.configureAuth': 'Configura OIDC / LDAP',
+
   // --- data plane: modifica / elimina / assegnazione nodi (v0.7) -------------
+  // empty state (W1)
+  'platform.dataplanes.emptyTitle': 'Nessun Data Plane registrato',
+  'platform.dataplanes.emptyExplain': 'Un Data Plane è un cluster di nodi di inferenza (gateway + nodi GPU) che si registra a questo Control Plane. Riceve snapshot di routing, autenticazione e policy tramite una connessione mTLS sicura.',
+  'platform.dataplanes.emptyNodesNote': 'I nodi non sono un prerequisito — esistono nella Fleet in modo indipendente e possono essere assegnati a un Data Plane dopo averlo creato.',
+  'platform.dataplanes.emptyRegisterCta': 'Registra un Data Plane',
+  'platform.dataplanes.emptyFleetLink': 'Vedi i nodi nella Fleet',
   'platform.dataplanes.edit': 'Modifica',
   'platform.dataplanes.editTitle': 'Modifica Data Plane',
   'platform.dataplanes.save': 'Salva',
@@ -906,7 +919,8 @@ export const it: Record<StringKey, string> = {
   'roles.picker.orgLabel': 'Organizzazione',
   'roles.picker.hint': "I ruoli sono gestiti per organizzazione. Selezionane una per vederne e modificarne i ruoli.",
   'roles.picker.placeholder': "Seleziona un'organizzazione…",
-  'roles.picker.noOrgs': "Nessuna organizzazione. Creane una prima, poi gestisci i suoi ruoli.",
+  'roles.picker.noOrgs': "I ruoli sono definiti per organizzazione. Devi avere almeno un'organizzazione per poter gestire i ruoli.",
+  'roles.picker.createOrgCta': 'Crea la prima organizzazione',
   'roles.assign.label': 'Ruolo',
   'roles.assign.hint': 'Il membro eredita i permessi di questo ruolo nel team.',
   'roles.assign.loading': 'Caricamento ruoli…',

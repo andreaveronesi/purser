@@ -224,7 +224,13 @@ export function OrganizationsPage() {
         {!isLoading && !isError && orgs.length === 0 && (
           <EmptyState
             icon={<IconBuildingOffice />}
+            title={t('platform.orgs.noOrgsTitle')}
             message={t('platform.orgs.noOrgs')}
+            action={
+              <Button variant="primary" size="sm" onClick={() => setShowCreate(true)}>
+                {t('platform.orgs.noOrgsCta')}
+              </Button>
+            }
           />
         )}
 

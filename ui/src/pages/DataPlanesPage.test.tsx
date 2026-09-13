@@ -7,7 +7,16 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { DataPlanesPage } from './DataPlanesPage';
+
+function renderPage() {
+  return render(
+    <MemoryRouter initialEntries={['/platform/dataplanes']}>
+      <DataPlanesPage />
+    </MemoryRouter>,
+  );
+}
 
 vi.mock('../i18n', () => ({
   useT: () => (key: string) => key,
@@ -82,13 +91,34 @@ beforeEach(() => {
 describe('DataPlanesPage — table', () => {
   it('shows empty state when no data planes', () => {
     mq.useDataPlanes.mockReturnValue(success([]));
-    render(<DataPlanesPage />);
-    expect(screen.getByText(/no data planes registered/i)).toBeDefined();
+    renderPage();
+    // W1: emptyTitle i18n key echoed back by mock
+    expect(screen.getByText('platform.dataplanes.emptyTitle')).toBeDefined();
+  });
+
+  it('empty state explains nodes are not a prerequisite (W1)', () => {
+    mq.useDataPlanes.mockReturnValue(success([]));
+    renderPage();
+    expect(screen.getByText('platform.dataplanes.emptyNodesNote')).toBeDefined();
+  });
+
+  it('empty state has Register Data Plane CTA button (W1)', () => {
+    mq.useDataPlanes.mockReturnValue(success([]));
+    renderPage();
+    expect(screen.getByText('platform.dataplanes.emptyRegisterCta')).toBeDefined();
+  });
+
+  it('empty state has Fleet link (W1)', () => {
+    mq.useDataPlanes.mockReturnValue(success([]));
+    renderPage();
+    const link = screen.getByRole('link', { name: 'platform.dataplanes.emptyFleetLink' });
+    expect(link).toBeDefined();
+    expect((link as HTMLAnchorElement).href).toContain('/platform/fleet');
   });
 
   it('renders table with name, tier, status, gateway, heartbeat, nodes columns', () => {
     mq.useDataPlanes.mockReturnValue(success([mkDp()]));
-    render(<DataPlanesPage />);
+    renderPage();
     expect(screen.getByText('test-cluster')).toBeDefined();
     expect(screen.getByText('https://gpu.test.com')).toBeDefined();
     // node count
@@ -97,7 +127,7 @@ describe('DataPlanesPage — table', () => {
 
   it('renders tier badge correctly for production', () => {
     mq.useDataPlanes.mockReturnValue(success([mkDp({ tier: 'production' })]));
-    const { container } = render(<DataPlanesPage />);
+    const { container } = renderPage();
     const badges = container.querySelectorAll('[data-testid="tier-badge"]');
     expect(badges.length).toBeGreaterThan(0);
     expect(badges[0].textContent).toBe('production');
@@ -105,14 +135,14 @@ describe('DataPlanesPage — table', () => {
 
   it('renders tier badge for staging', () => {
     mq.useDataPlanes.mockReturnValue(success([mkDp({ tier: 'staging' })]));
-    const { container } = render(<DataPlanesPage />);
+    const { container } = renderPage();
     const badges = container.querySelectorAll('[data-testid="tier-badge"]');
     expect(badges[0].textContent).toBe('staging');
   });
 
   it('shows status pill for active DP', () => {
     mq.useDataPlanes.mockReturnValue(success([mkDp({ status: 'active' })]));
-    const { container } = render(<DataPlanesPage />);
+    const { container } = renderPage();
     const pills = container.querySelectorAll('[data-testid="dp-status-pill"]');
     expect(pills.length).toBeGreaterThan(0);
     expect(pills[0].textContent).toContain('active');
@@ -120,20 +150,20 @@ describe('DataPlanesPage — table', () => {
 
   it('shows status pill for degraded DP', () => {
     mq.useDataPlanes.mockReturnValue(success([mkDp({ status: 'degraded' })]));
-    const { container } = render(<DataPlanesPage />);
+    const { container } = renderPage();
     const pills = container.querySelectorAll('[data-testid="dp-status-pill"]');
     expect(pills[0].textContent).toContain('degraded');
   });
 
   it('shows "never" when lastHeartbeat is null', () => {
     mq.useDataPlanes.mockReturnValue(success([mkDp({ lastHeartbeat: null })]));
-    render(<DataPlanesPage />);
+    renderPage();
     expect(screen.getByText('never')).toBeDefined();
   });
 
   it('shows loading state', () => {
     mq.useDataPlanes.mockReturnValue(loading());
-    render(<DataPlanesPage />);
+    renderPage();
     // LoadingBlock renders a spinner — just verify no crash and no table
     expect(screen.queryByRole('table')).toBeNull();
   });
@@ -145,14 +175,14 @@ describe('DataPlanesPage — table', () => {
 
 describe('DataPlanesPage — register modal', () => {
   it('opens register modal on button click', () => {
-    render(<DataPlanesPage />);
+    renderPage();
     fireEvent.click(screen.getByTestId('register-dp-btn'));
     // Modal is open when the name input is present
     expect(screen.getByTestId('dp-name-input')).toBeDefined();
   });
 
   it('submit button is disabled when name is empty', () => {
-    render(<DataPlanesPage />);
+    renderPage();
     fireEvent.click(screen.getByTestId('register-dp-btn'));
     const btn = screen.getByTestId('register-dp-submit');
     expect(btn).toBeDisabled();
@@ -161,7 +191,7 @@ describe('DataPlanesPage — register modal', () => {
   it('calls createDataPlane with correct values on submit', () => {
     const mutate = vi.fn();
     mq.useCreateDataPlane.mockReturnValue({ mutate, isPending: false });
-    render(<DataPlanesPage />);
+    renderPage();
     fireEvent.click(screen.getByTestId('register-dp-btn'));
     fireEvent.change(screen.getByTestId('dp-name-input'), { target: { value: 'new-cluster' } });
     fireEvent.change(screen.getByTestId('dp-gateway-input'), { target: { value: 'https://new.example.com' } });
@@ -186,7 +216,7 @@ describe('DataPlanesPage — join token', () => {
     });
     mq.useCreateDataPlane.mockReturnValue({ mutate, isPending: false });
 
-    render(<DataPlanesPage />);
+    renderPage();
     fireEvent.click(screen.getByTestId('register-dp-btn'));
     fireEvent.change(screen.getByTestId('dp-name-input'), { target: { value: 'x' } });
     fireEvent.click(screen.getByTestId('register-dp-submit'));
@@ -210,7 +240,7 @@ describe('DataPlanesPage — join token', () => {
     });
     mq.useCreateDataPlane.mockReturnValue({ mutate, isPending: false });
 
-    render(<DataPlanesPage />);
+    renderPage();
     fireEvent.click(screen.getByTestId('register-dp-btn'));
     fireEvent.change(screen.getByTestId('dp-name-input'), { target: { value: 'y' } });
     fireEvent.click(screen.getByTestId('register-dp-submit'));
@@ -233,7 +263,7 @@ describe('DataPlanesPage — config refresh', () => {
     mq.useRefreshDataPlaneConfig.mockReturnValue({ mutate, isPending: false });
     mq.useDataPlanes.mockReturnValue(success([mkDp()]));
 
-    render(<DataPlanesPage />);
+    renderPage();
     // Expand the row first
     fireEvent.click(screen.getByText('test-cluster'));
     // Click refresh
@@ -252,7 +282,7 @@ describe('DataPlanesPage — edit', () => {
     mq.useUpdateDataPlane.mockReturnValue({ mutate: vi.fn(), mutateAsync, isPending: false, isError: false, error: null });
     mq.useDataPlanes.mockReturnValue(success([mkDp()]));
 
-    render(<DataPlanesPage />);
+    renderPage();
     fireEvent.click(screen.getByText('test-cluster'));
     fireEvent.click(screen.getByTestId('edit-dp-btn'));
 
@@ -280,7 +310,7 @@ describe('DataPlanesPage — delete (arm→confirm)', () => {
     mq.useDeleteDataPlane.mockReturnValue({ mutate: vi.fn(), mutateAsync, isPending: false, isError: false, error: null });
     mq.useDataPlanes.mockReturnValue(success([mkDp()]));
 
-    render(<DataPlanesPage />);
+    renderPage();
     fireEvent.click(screen.getByText('test-cluster'));
 
     fireEvent.click(screen.getByTestId('delete-dp-btn'));
@@ -304,7 +334,7 @@ describe('DataPlanesPage — node assignment', () => {
     mq.useAssignNodeToDataPlane.mockReturnValue({ mutate: vi.fn(), mutateAsync, isPending: false, isError: false, error: null });
     mq.useDataPlanes.mockReturnValue(success([mkDp()]));
 
-    render(<DataPlanesPage />);
+    renderPage();
     fireEvent.click(screen.getByText('test-cluster'));
 
     fireEvent.change(screen.getByTestId('assign-node-input'), { target: { value: 'node-9' } });
@@ -321,7 +351,7 @@ describe('DataPlanesPage — node assignment', () => {
     mq.useDataPlaneNodes.mockReturnValue(success([{ id: 'node-1', hostname: 'gpu-1', state: 'ready' }]));
     mq.useDataPlanes.mockReturnValue(success([mkDp()]));
 
-    render(<DataPlanesPage />);
+    renderPage();
     fireEvent.click(screen.getByText('test-cluster'));
 
     // The assigned node is listed.

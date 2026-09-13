@@ -437,7 +437,15 @@ function RolesOrgPicker() {
         )}
 
         {!isLoading && !isError && orgs.length === 0 && (
-          <EmptyState icon={<IconShield />} message={t('roles.picker.noOrgs')} />
+          <EmptyState
+            icon={<IconShield />}
+            message={t('roles.picker.noOrgs')}
+            action={
+              <Link to="/platform/orgs">
+                {t('roles.picker.createOrgCta')}
+              </Link>
+            }
+          />
         )}
 
         {orgs.length > 0 && (

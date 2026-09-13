@@ -292,6 +292,9 @@ Team C (shared pool: node-3, node-4; quota: max_deployments=2)
 
 ## Node Pools page (UI)
 
+A **node pool** is a group of fleet nodes reserved for a team or purpose. The page
+starts empty — create a pool first, then assign nodes and configure per-team quotas.
+
 The **Node Pools** page in the operator dashboard lists every pool with its owner,
 policy, and node count. Per row:
 

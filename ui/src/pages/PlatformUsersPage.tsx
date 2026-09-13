@@ -9,6 +9,7 @@
 // initial chip generated from their identifier. Users inactive for >30 days
 // appear at reduced opacity to surface who is active.
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Badge,
   Button,
@@ -20,6 +21,7 @@ import {
   type Tone,
 } from '../components/ui';
 import { usePlatformUsers } from '../hooks/queries';
+import { useT } from '../i18n';
 import { relativeTime } from '../lib/format';
 import type { PlatformUser } from '../api/types';
 
@@ -254,6 +256,7 @@ function InviteInfoModal({ onClose }: { onClose: () => void }) {
 // ---------------------------------------------------------------------------
 
 export function PlatformUsersPage() {
+  const t = useT();
   const { data, isLoading, isError, error, refetch } = usePlatformUsers();
   const [orgFilter, setOrgFilter] = useState<string>('');
   const [showInvite, setShowInvite] = useState(false);
@@ -312,10 +315,13 @@ export function PlatformUsersPage() {
         )}
         {!isLoading && !isError && filtered.length === 0 && (
           <EmptyState
-            message={
-              orgFilter
-                ? `No users in "${orgFilter}". Try clearing the organization filter.`
-                : 'No users found. Users appear here after their first login via OIDC or LDAP.'
+            message={orgFilter ? t('platform.users.noUsersFiltered') : t('platform.users.noUsers')}
+            action={
+              !orgFilter ? (
+                <Link to="/platform/settings" style={{ fontSize: '14px' }}>
+                  {t('platform.users.configureAuth')}
+                </Link>
+              ) : undefined
             }
           />
         )}

@@ -8,6 +8,7 @@
 // get a teal left-border accent, and the empty state shows the CP→DP
 // topology so a new operator immediately understands what to register.
 import { useState, type CSSProperties } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Button,
   Card,
@@ -494,7 +495,8 @@ function EditDpModal({ dp, onClose }: { dp: DataPlane; onClose: () => void }) {
 // Shown when no Data Planes are registered.
 // ---------------------------------------------------------------------------
 
-function DataPlanesEmptyState() {
+function DataPlanesEmptyState({ onRegister }: { onRegister?: () => void }) {
+  const t = useT();
   return (
     <div
       style={{
@@ -505,7 +507,7 @@ function DataPlanesEmptyState() {
         gap: '20px',
       }}
     >
-      {/* ASCII-style topology diagram */}
+      {/* ASCII-style topology diagram — kept for visual context */}
       <svg
         width="320"
         height="120"
@@ -541,12 +543,25 @@ function DataPlanesEmptyState() {
         <text x="307" y="69" textAnchor="middle" fontSize="8" fill="currentColor">API</text>
       </svg>
 
-      <div style={{ textAlign: 'center', maxWidth: '360px' }}>
-        <p style={{ fontWeight: 600, marginBottom: '8px' }}>No Data Planes registered</p>
+      <div style={{ textAlign: 'center', maxWidth: '400px' }}>
+        <p style={{ fontWeight: 600, marginBottom: '8px' }}>{t('platform.dataplanes.emptyTitle')}</p>
         <p style={{ color: 'var(--text-muted)', fontSize: '14px', lineHeight: 1.6 }}>
-          Register your first Data Plane to connect an inference cluster.
-          Each DP registers with a one-time join token and receives config snapshots from this Control Plane.
+          {t('platform.dataplanes.emptyExplain')}
         </p>
+        <p style={{ color: 'var(--text-muted)', fontSize: '14px', lineHeight: 1.6, marginTop: '8px' }}>
+          {t('platform.dataplanes.emptyNodesNote')}
+        </p>
+      </div>
+
+      <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
+        {onRegister && (
+          <Button variant="primary" size="sm" onClick={onRegister}>
+            {t('platform.dataplanes.emptyRegisterCta')}
+          </Button>
+        )}
+        <Link to="/platform/fleet" style={{ fontSize: '14px' }}>
+          {t('platform.dataplanes.emptyFleetLink')}
+        </Link>
       </div>
     </div>
   );
@@ -725,7 +740,7 @@ export function DataPlanesPage() {
             onRetry={() => refetch()}
           />
         )}
-        {data && data.length === 0 && <DataPlanesEmptyState />}
+        {data && data.length === 0 && <DataPlanesEmptyState onRegister={() => setShowRegister(true)} />}
         {data && data.length > 0 && (
           <div className="table-wrap">
             <table className="table">

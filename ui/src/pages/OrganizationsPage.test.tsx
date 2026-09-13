@@ -142,6 +142,27 @@ describe('OrganizationsPage — empty', () => {
     const { container } = renderPage();
     expect(container.querySelector('table')).toBeNull();
   });
+
+  it('renders explanatory title in empty state (W1)', () => {
+    mq.useOrganizations.mockReturnValue(orgsSuccess([]));
+    renderPage();
+    // EmptyState title prop — echoed by mocked i18n
+    expect(screen.getByText('platform.orgs.noOrgsTitle')).toBeDefined();
+  });
+
+  it('renders Create Organization CTA button in empty state (W1)', () => {
+    mq.useOrganizations.mockReturnValue(orgsSuccess([]));
+    renderPage();
+    // CTA button inside the empty state action prop
+    expect(screen.getByRole('button', { name: 'platform.orgs.noOrgsCta' })).toBeDefined();
+  });
+
+  it('clicking empty-state CTA opens the create-org dialog (W1)', () => {
+    mq.useOrganizations.mockReturnValue(orgsSuccess([]));
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'platform.orgs.noOrgsCta' }));
+    expect(screen.getByRole('dialog')).toBeDefined();
+  });
 });
 
 // ---------------------------------------------------------------------------

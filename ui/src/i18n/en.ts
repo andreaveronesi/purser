@@ -509,7 +509,9 @@ export const en = {
   'platform.orgs.name': 'Name',
   'platform.orgs.slug': 'Slug',
   'platform.orgs.description': 'Description',
-  'platform.orgs.noOrgs': 'No organizations yet.',
+  'platform.orgs.noOrgsTitle': 'No organizations yet',
+  'platform.orgs.noOrgs': 'Organizations group teams, roles, quotas, and billing by business unit. Each org is an isolated namespace with its own members and access controls.',
+  'platform.orgs.noOrgsCta': 'Create your first organization',
   'platform.orgs.delete': 'Delete',
   'platform.orgs.deleteConfirm': 'Delete organization {name}? This cannot be undone.',
   'platform.orgs.viewTeams': 'View Teams',
@@ -553,7 +555,7 @@ export const en = {
   'platform.pools.assignNode': 'Assign Node',
   'platform.pools.removeNode': 'Remove',
   'platform.pools.noNodes': 'No nodes assigned.',
-  'platform.pools.noPools': 'No node pools yet. Pools group fleet nodes by team or purpose so you can set per-team quotas. Create your first pool to get started.',
+  'platform.pools.noPools': "A node pool is a group of fleet nodes reserved for a team or purpose. You haven't created any yet. Create one to assign nodes and set per-team quotas.",
   'platform.pools.emptyCta': 'Create your first pool',
   'platform.pools.col.name': 'Name',
   'platform.pools.col.owner': 'Owner',
@@ -579,7 +581,18 @@ export const en = {
   'platform.pools.deleteHasNodes': 'Remove all assigned nodes before deleting this pool.',
   'error.pools': 'Could not load node pools.',
 
+  // --- platform users (W1) ---------------------------------------------------
+  'platform.users.noUsers': 'No users yet. Users appear here after their first login via OIDC or LDAP.',
+  'platform.users.noUsersFiltered': 'No users in this organization. Try clearing the filter.',
+  'platform.users.configureAuth': 'Configure OIDC / LDAP',
+
   // --- data planes: edit / delete / node assignment (v0.7) -------------------
+  // empty state (W1)
+  'platform.dataplanes.emptyTitle': 'No Data Planes registered',
+  'platform.dataplanes.emptyExplain': 'A Data Plane is a cluster of inference nodes (gateway + GPU nodes) that registers with this Control Plane. It receives routing, auth, and policy snapshots over a secure mTLS connection.',
+  'platform.dataplanes.emptyNodesNote': 'Nodes are not a prerequisite — they exist in the Fleet independently and can be assigned to a Data Plane after you create one.',
+  'platform.dataplanes.emptyRegisterCta': 'Register a Data Plane',
+  'platform.dataplanes.emptyFleetLink': 'View nodes in the Fleet',
   'platform.dataplanes.edit': 'Edit',
   'platform.dataplanes.editTitle': 'Edit Data Plane',
   'platform.dataplanes.save': 'Save',
@@ -929,7 +942,8 @@ export const en = {
   'roles.picker.orgLabel': 'Organization',
   'roles.picker.hint': 'Roles are managed per organization. Pick one to view and edit its roles.',
   'roles.picker.placeholder': 'Select an organization…',
-  'roles.picker.noOrgs': 'No organizations yet. Create one first, then manage its roles.',
+  'roles.picker.noOrgs': 'Roles are defined per organization. You need at least one organization before you can manage roles.',
+  'roles.picker.createOrgCta': 'Create your first organization',
   'roles.assign.label': 'Role',
   'roles.assign.hint': "The member inherits this role's permissions in the team.",
   'roles.assign.loading': 'Loading roles…',

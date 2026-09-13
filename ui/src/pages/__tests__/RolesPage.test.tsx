@@ -442,6 +442,8 @@ describe('RolesPage — org picker (no orgId in URL)', () => {
     vi.mocked(useDeleteRole).mockReturnValue(mut());
 
     renderPicker();
-    expect(screen.getByText(/no organizations yet/i)).toBeInTheDocument();
+    // W1: updated copy — roles are defined per org, with a CTA to create one
+    expect(screen.getByText(/roles are defined per organization/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /create your first organization/i })).toBeInTheDocument();
   });
 });

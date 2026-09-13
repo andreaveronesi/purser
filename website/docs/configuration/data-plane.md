@@ -57,6 +57,11 @@ the CP can mark a DP `degraded` or `offline` when it goes silent.
 
 ### Node assignment
 
+**Nodes are not a prerequisite for creating a Data Plane.** Fleet nodes exist
+independently and can be assigned to a Data Plane at any time after creation — the
+Data Planes page will show empty until you register at least one DP, regardless of
+how many nodes are in your fleet.
+
 Every fleet node can be assigned to exactly one Data Plane. Nodes with no assignment
 belong to the default (unpartitioned) pool and are available for deployments that
 do not specify a DP. Assignment is changed at any time via the REST API.
