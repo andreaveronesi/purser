@@ -444,6 +444,9 @@ describe('RolesPage — org picker (no orgId in URL)', () => {
     renderPicker();
     // W1: updated copy — roles are defined per org, with a CTA to create one
     expect(screen.getByText(/roles are defined per organization/i)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /create your first organization/i })).toBeInTheDocument();
+    const createOrgLink = screen.getByRole('link', { name: /create your first organization/i });
+    expect(createOrgLink).toBeInTheDocument();
+    // W1: link must point to the Organizations page
+    expect(createOrgLink.getAttribute('href')).toBe('/platform/orgs');
   });
 });
