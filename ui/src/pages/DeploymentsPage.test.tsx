@@ -124,7 +124,10 @@ describe('DeploymentHealthBadge', () => {
 
     render(<DeploymentHealthBadge modelId="llama-8b" />);
 
-    expect(screen.getByText('Unavailable')).toBeInTheDocument();
+    // W1: the word "unavailable" is misleading (implies network unreachability).
+    // The health badge for unavailable status must now read "Not serving".
+    expect(screen.getByText('Not serving')).toBeInTheDocument();
+    expect(screen.queryByText('Unavailable')).not.toBeInTheDocument();
   });
 
   it('renders_neutral_when_loading', () => {
@@ -385,4 +388,189 @@ describe('DeploymentsPage — state label per deployment state', () => {
       );
     }
   );
+});
+
+// ---------------------------------------------------------------------------
+// W1 usability: section grouping, clear labels, undeploy option A
+// These tests are written FAILING-FIRST before the implementation is added.
+// ---------------------------------------------------------------------------
+
+const stoppedDeployment: Deployment = {
+  ...realShapedDeployment,
+  id: 'dep-stopped-w1',
+  state: 'stopped',
+};
+
+const failedDeployment: Deployment = {
+  ...realShapedDeployment,
+  id: 'dep-failed-w1',
+  state: 'failed',
+};
+
+// Helper: default health mock for a stopped/unavailable model.
+function mockHealthUnavailable() {
+  mockedUseModelHealth.mockReturnValue({
+    data: { modelId: 'tinyllama-1b', status: 'unavailable', deploymentId: '', deploymentState: 'stopped', nodeCount: 0 },
+    isLoading: false, isError: false, error: null, isPending: false, isSuccess: true,
+  } as ReturnType<typeof useModelHealth>);
+}
+
+function mockHealthHealthy() {
+  mockedUseModelHealth.mockReturnValue({
+    data: { modelId: 'tinyllama-1b', status: 'healthy', deploymentId: 'dep-1', deploymentState: 'active', nodeCount: 1 },
+    isLoading: false, isError: false, error: null, isPending: false, isSuccess: true,
+  } as ReturnType<typeof useModelHealth>);
+}
+
+describe('DeploymentsPage — W1: section headings', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockHealthHealthy();
+  });
+
+  it('shows_active_and_not_serving_section_headings_when_mix_of_deployments', async () => {
+    mockedUseDeployments.mockReturnValue({
+      data: [realShapedDeployment, stoppedDeployment],
+      isLoading: false, isError: false, error: null, refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useDeployments>);
+
+    renderDeploymentsPage();
+
+    await waitFor(() => expect(screen.getByText('Active deployments')).toBeInTheDocument());
+    expect(screen.getByText('Not serving')).toBeInTheDocument();
+  });
+
+  it('active_section_empty_state_shown_when_all_deployments_are_stopped', async () => {
+    mockHealthUnavailable();
+    mockedUseDeployments.mockReturnValue({
+      data: [stoppedDeployment],
+      isLoading: false, isError: false, error: null, refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useDeployments>);
+
+    renderDeploymentsPage();
+
+    await waitFor(() => expect(screen.getByText('Active deployments')).toBeInTheDocument());
+    expect(screen.getByText('No active deployments.')).toBeInTheDocument();
+  });
+
+  it('stopped_deployment_appears_under_not_serving_section', async () => {
+    mockHealthUnavailable();
+    mockedUseDeployments.mockReturnValue({
+      data: [stoppedDeployment],
+      isLoading: false, isError: false, error: null, refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useDeployments>);
+
+    renderDeploymentsPage();
+
+    await waitFor(() => expect(screen.getByText('Not serving')).toBeInTheDocument());
+    // The stopped card (tinyllama-1b) is in the document and the section heading is visible.
+    expect(screen.getByText('tinyllama-1b')).toBeInTheDocument();
+  });
+});
+
+describe('DeploymentsPage — W1: configure button label replaces "The plan"', () => {
+  it('stopped_deployment_shows_configure_and_start_not_the_plan', async () => {
+    vi.clearAllMocks();
+    mockHealthUnavailable();
+    mockedUseDeployments.mockReturnValue({
+      data: [stoppedDeployment],
+      isLoading: false, isError: false, error: null, refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useDeployments>);
+
+    renderDeploymentsPage();
+
+    await waitFor(() => expect(screen.getByText('tinyllama-1b')).toBeInTheDocument());
+    expect(screen.queryByText('The plan')).not.toBeInTheDocument();
+    expect(screen.getByText('Configure and start')).toBeInTheDocument();
+  });
+
+  it('active_deployment_shows_reconfigure_not_the_plan', async () => {
+    vi.clearAllMocks();
+    mockHealthHealthy();
+    mockedUseDeployments.mockReturnValue({
+      data: [realShapedDeployment],
+      isLoading: false, isError: false, error: null, refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useDeployments>);
+
+    renderDeploymentsPage();
+
+    await waitFor(() => expect(screen.getByText('tinyllama-1b')).toBeInTheDocument());
+    expect(screen.queryByText('The plan')).not.toBeInTheDocument();
+    expect(screen.getByText('Reconfigure')).toBeInTheDocument();
+  });
+});
+
+describe('DeploymentsPage — W1: undeploy option A (hide for stopped/failed)', () => {
+  it('stopped_deployment_has_no_undeploy_button', async () => {
+    vi.clearAllMocks();
+    mockHealthUnavailable();
+    mockedUseDeployments.mockReturnValue({
+      data: [stoppedDeployment],
+      isLoading: false, isError: false, error: null, refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useDeployments>);
+
+    renderDeploymentsPage();
+
+    await waitFor(() => expect(screen.getByText('tinyllama-1b')).toBeInTheDocument());
+    expect(screen.queryByText('Undeploy')).not.toBeInTheDocument();
+  });
+
+  it('failed_deployment_has_no_undeploy_button', async () => {
+    vi.clearAllMocks();
+    mockHealthUnavailable();
+    mockedUseDeployments.mockReturnValue({
+      data: [failedDeployment],
+      isLoading: false, isError: false, error: null, refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useDeployments>);
+
+    renderDeploymentsPage();
+
+    await waitFor(() => expect(screen.getByText('tinyllama-1b')).toBeInTheDocument());
+    expect(screen.queryByText('Undeploy')).not.toBeInTheDocument();
+  });
+
+  it('active_deployment_has_undeploy_button', async () => {
+    vi.clearAllMocks();
+    mockHealthHealthy();
+    mockedUseDeployments.mockReturnValue({
+      data: [realShapedDeployment],
+      isLoading: false, isError: false, error: null, refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useDeployments>);
+
+    renderDeploymentsPage();
+
+    await waitFor(() => expect(screen.getByText('tinyllama-1b')).toBeInTheDocument());
+    expect(screen.getByText('Undeploy')).toBeInTheDocument();
+  });
+});
+
+describe('DeploymentsPage — W1: inactive hint', () => {
+  it('stopped_deployment_shows_hint_element', async () => {
+    vi.clearAllMocks();
+    mockHealthUnavailable();
+    mockedUseDeployments.mockReturnValue({
+      data: [stoppedDeployment],
+      isLoading: false, isError: false, error: null, refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useDeployments>);
+
+    renderDeploymentsPage();
+
+    await waitFor(() =>
+      expect(screen.getByTestId('dep-inactive-hint')).toBeInTheDocument()
+    );
+  });
+
+  it('active_deployment_has_no_hint_element', async () => {
+    vi.clearAllMocks();
+    mockHealthHealthy();
+    mockedUseDeployments.mockReturnValue({
+      data: [realShapedDeployment],
+      isLoading: false, isError: false, error: null, refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useDeployments>);
+
+    renderDeploymentsPage();
+
+    await waitFor(() => expect(screen.getByText('tinyllama-1b')).toBeInTheDocument());
+    expect(screen.queryByTestId('dep-inactive-hint')).not.toBeInTheDocument();
+  });
 });
