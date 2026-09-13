@@ -20,11 +20,14 @@ vi.mock('../i18n', () => ({
 }));
 
 // Mock hooks/queries before importing the page component.
+// useApiKeyTeamSlugs must be included — it is called inside CreateKeyModal and
+// would be undefined if omitted (causing "not a function" at runtime in tests).
 vi.mock('../hooks/queries', () => ({
   useApiKeys: vi.fn(),
   useCreateApiKey: vi.fn(),
   useRevokeApiKey: vi.fn(),
   useKeyUsage: vi.fn(),
+  useApiKeyTeamSlugs: vi.fn(),
 }));
 
 import * as queries from '../hooks/queries';
@@ -58,6 +61,7 @@ const mq = queries as unknown as {
   useCreateApiKey: ReturnType<typeof vi.fn>;
   useRevokeApiKey: ReturnType<typeof vi.fn>;
   useKeyUsage: ReturnType<typeof vi.fn>;
+  useApiKeyTeamSlugs: ReturnType<typeof vi.fn>;
 };
 
 function renderPage() {
@@ -97,6 +101,7 @@ beforeEach(() => {
   mq.useCreateApiKey.mockReturnValue(mutationStub);
   mq.useRevokeApiKey.mockReturnValue(mutationStub);
   mq.useKeyUsage.mockReturnValue(idle());
+  mq.useApiKeyTeamSlugs.mockReturnValue([]);
 });
 
 // ---------------------------------------------------------------------------
@@ -188,6 +193,115 @@ describe('ApiKeysPage — API Keys table', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Routed bug regression: null monthlyQuota must render "Unlimited" not crash
+// (M2 fixed Meter to guard null internally; the call site should use ?? 0)
+// ---------------------------------------------------------------------------
+
+describe('ApiKeysPage — monthlyQuota null safety', () => {
+  it('renders "Unlimited" text when monthlyQuota is null and does NOT crash', () => {
+    mq.useApiKeys.mockReturnValue(
+      success([mkKey({ id: 'key_null_quota', monthlyQuota: null, usedThisMonth: 0 })]),
+    );
+    mq.useKeyUsage.mockReturnValue(idle());
+    const { getByText } = renderPage();
+    // Must show the unlimited label — NOT try to render a Meter with a null total.
+    expect(getByText('settings.usage.unlimited')).toBeDefined();
+    // No crash means the element count is at least 1 (sanity).
+    const meterEl = document.querySelector('[role="meter"]');
+    expect(meterEl).toBeNull();
+  });
+
+  it('renders Meter with correct total and percentage when monthlyQuota is a number', () => {
+    mq.useApiKeys.mockReturnValue(
+      success([mkKey({ id: 'key_quota_100', monthlyQuota: 500, usedThisMonth: 250 })]),
+    );
+    mq.useKeyUsage.mockReturnValue(idle());
+    const { container } = renderPage();
+    const meter = container.querySelector('[role="meter"]');
+    expect(meter).not.toBeNull();
+    // 250 / 500 = 50%
+    expect(meter!.getAttribute('aria-valuenow')).toBe('50');
+    expect(meter!.getAttribute('aria-valuemax')).toBe('100');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Loading / error states
+// ---------------------------------------------------------------------------
+
+describe('ApiKeysPage — loading and error states', () => {
+  it('renders loading block when query is loading', () => {
+    mq.useApiKeys.mockReturnValue({ isLoading: true, isError: false, error: null, data: undefined, refetch: vi.fn() });
+    const { container } = renderPage();
+    // Loading block present; no table
+    expect(container.querySelector('table')).toBeNull();
+  });
+
+  it('renders error state when query fails', () => {
+    mq.useApiKeys.mockReturnValue({
+      isLoading: false, isError: true,
+      error: new Error('network error'), data: undefined, refetch: vi.fn(),
+    });
+    renderPage();
+    // ErrorState renders role="alert"
+    expect(screen.getByRole('alert')).toBeDefined();
+  });
+
+  it('renders empty state when data is an empty array', () => {
+    mq.useApiKeys.mockReturnValue(success([]));
+    renderPage();
+    expect(screen.getByText('settings.keys.empty')).toBeDefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Revoke key — confirm modal gating destructive delete
+// ---------------------------------------------------------------------------
+
+describe('ApiKeysPage — revoke confirmation', () => {
+  it('shows confirm modal when Revoke is clicked, and does NOT mutate immediately', () => {
+    const revokeMutate = vi.fn();
+    mq.useApiKeys.mockReturnValue(success([mkKey({ id: 'key_revoke' })]));
+    mq.useRevokeApiKey.mockReturnValue({ mutate: revokeMutate, isPending: false });
+    mq.useKeyUsage.mockReturnValue(idle());
+    renderPage();
+
+    fireEvent.click(screen.getByText('settings.action.revoke'));
+    // Dialog should appear
+    expect(screen.getByRole('dialog')).toBeDefined();
+    // Mutation must NOT have been called yet
+    expect(revokeMutate).not.toHaveBeenCalled();
+  });
+
+  it('calls revokeApiKey with the key id when Revoke is confirmed', () => {
+    const revokeMutate = vi.fn();
+    mq.useApiKeys.mockReturnValue(success([mkKey({ id: 'key_revoke_confirm' })]));
+    mq.useRevokeApiKey.mockReturnValue({ mutate: revokeMutate, isPending: false });
+    mq.useKeyUsage.mockReturnValue(idle());
+    renderPage();
+
+    fireEvent.click(screen.getByText('settings.action.revoke'));
+    // Find and click confirm inside the dialog
+    const dialog = screen.getByRole('dialog');
+    const revokeBtn = dialog.querySelectorAll('button');
+    // The dialog footer has cancel + revoke — click the danger button
+    const revokeConfirm = Array.from(revokeBtn).find(
+      (b) => b.textContent === 'settings.action.revoke',
+    );
+    fireEvent.click(revokeConfirm!);
+    expect(revokeMutate).toHaveBeenCalledWith('key_revoke_confirm');
+  });
+
+  it('does not show Revoke button for already-revoked keys', () => {
+    mq.useApiKeys.mockReturnValue(success([mkKey({ id: 'already_revoked', revoked: true })]));
+    mq.useKeyUsage.mockReturnValue(idle());
+    renderPage();
+    // The revoke action should not appear for a revoked key
+    expect(screen.queryByText('settings.action.revoke')).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // CSV export
 // ---------------------------------------------------------------------------
 
@@ -237,5 +351,77 @@ describe('ApiKeysPage — CSV export', () => {
     createURL.mockRestore();
     revokeURL.mockRestore();
     createSpy.mockRestore();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Create key modal
+// ---------------------------------------------------------------------------
+
+describe('ApiKeysPage — create key modal', () => {
+  it('opens create modal when "Create key" is clicked', () => {
+    renderPage();
+    fireEvent.click(screen.getByText('settings.keys.new'));
+    expect(screen.getByRole('dialog')).toBeDefined();
+  });
+
+  it('submit is disabled when name or team is empty', () => {
+    renderPage();
+    fireEvent.click(screen.getByText('settings.keys.new'));
+    const submitBtn = screen.getByText('settings.create.submit').closest('button')!;
+    expect(submitBtn).toBeDisabled();
+  });
+
+  it('calls create mutation with name, team, role and quota payload', () => {
+    const createMutate = vi.fn();
+    mq.useCreateApiKey.mockReturnValue({ mutate: createMutate, isPending: false });
+    mq.useApiKeyTeamSlugs.mockReturnValue([]); // freeform text input path
+    renderPage();
+    fireEvent.click(screen.getByText('settings.keys.new'));
+    const dialog = screen.getByRole('dialog');
+
+    // Fill name — first text input in the dialog
+    const allInputs = Array.from(dialog.querySelectorAll('input.input')) as HTMLInputElement[];
+    const nameInput = allInputs[0];
+    fireEvent.change(nameInput, { target: { value: 'my-key' } });
+
+    // Fill team — second text input (no slugs → freeform, not a select)
+    const teamInput = allInputs[1];
+    fireEvent.change(teamInput, { target: { value: 'platform' } });
+
+    fireEvent.click(screen.getByText('settings.create.submit').closest('button')!);
+
+    expect(createMutate).toHaveBeenCalledTimes(1);
+    const arg = createMutate.mock.calls[0][0];
+    expect(arg).toEqual(expect.objectContaining({ name: 'my-key', team: 'platform' }));
+  });
+
+  it('renders role select with dropdown from org teams when slugs are available', () => {
+    mq.useApiKeyTeamSlugs.mockReturnValue(['alpha', 'beta', 'gamma']);
+    renderPage();
+    fireEvent.click(screen.getByText('settings.keys.new'));
+    screen.getByRole('dialog'); // ensure modal is open
+    // Dropdown should have team options
+    expect(screen.getByRole('option', { name: 'alpha' })).toBeDefined();
+    expect(screen.getByRole('option', { name: 'beta' })).toBeDefined();
+  });
+
+  it('converts empty quota to null (unlimited)', () => {
+    const createMutate = vi.fn();
+    mq.useCreateApiKey.mockReturnValue({ mutate: createMutate, isPending: false });
+    mq.useApiKeyTeamSlugs.mockReturnValue([]);
+    renderPage();
+    fireEvent.click(screen.getByText('settings.keys.new'));
+    const dialog = screen.getByRole('dialog');
+    const allInputs = Array.from(dialog.querySelectorAll('input.input')) as HTMLInputElement[];
+    fireEvent.change(allInputs[0], { target: { value: 'key-name' } });
+    fireEvent.change(allInputs[1], { target: { value: 'infra' } });
+    // Leave quota empty (default)
+
+    fireEvent.click(screen.getByText('settings.create.submit').closest('button')!);
+
+    const arg = createMutate.mock.calls[0][0];
+    // Empty quota should be treated as null (unlimited)
+    expect(arg.monthlyQuota).toBeNull();
   });
 });

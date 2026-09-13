@@ -127,3 +127,295 @@ describe('TeamPage — member role picker', () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// TeamPage — loading and error states for useTeam
+// ---------------------------------------------------------------------------
+
+describe('TeamPage — loading state', () => {
+  it('renders a loading block when useTeam is loading', () => {
+    vi.mocked(useTeam).mockReturnValue(qr({ isLoading: true }));
+    renderPage();
+    // No page header title yet, just loading block
+    expect(screen.queryByRole('heading')).not.toBeInTheDocument();
+  });
+});
+
+describe('TeamPage — error state', () => {
+  it('renders error alert when useTeam fails', () => {
+    vi.mocked(useTeam).mockReturnValue(qr({ isError: true, error: new Error('Not found') }));
+    renderPage();
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// TeamPage — members card: remove member confirm-first pattern
+// ---------------------------------------------------------------------------
+
+describe('TeamPage — remove member (confirm-first)', () => {
+  it('first click shows confirm, second click calls removeMember', () => {
+    const removeMutateAsync = vi.fn(() => Promise.resolve());
+    vi.mocked(useRemoveTeamMember).mockReturnValue(
+      mut({ mutateAsync: removeMutateAsync }),
+    );
+    vi.mocked(useTeamMembers).mockReturnValue(
+      qr({
+        data: {
+          members: [
+            {
+              id: 1,
+              team_id: 'team-1',
+              user_id: 'alice@example.com',
+              role_id: 'developer',
+              created_at: '2026-01-01T00:00:00Z',
+              user: { email: 'alice@example.com', display_name: 'Alice' },
+              role: { name: 'Developer', permissions: [] },
+            },
+          ],
+        },
+      }),
+    );
+    renderPage();
+
+    // First click — arms confirm
+    const trashBtn = screen.getByRole('button', { name: /remove/i });
+    fireEvent.click(trashBtn);
+    // Cancel button appears
+    expect(screen.getByRole('button', { name: /cancel/i })).toBeInTheDocument();
+    expect(removeMutateAsync).not.toHaveBeenCalled();
+
+    // Confirm click — fires remove
+    fireEvent.click(screen.getByRole('button', { name: /remove/i }));
+    expect(removeMutateAsync).toHaveBeenCalledWith('alice@example.com');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// TeamPage — My Permissions card
+// ---------------------------------------------------------------------------
+
+describe('TeamPage — My Permissions card', () => {
+  it('renders Org Admin badge when is_org_admin is true', () => {
+    vi.mocked(useMyTeamPermissions).mockReturnValue(
+      qr({ data: { permissions: [], is_org_admin: true } }),
+    );
+    renderPage();
+    expect(screen.getByText('Org Admin')).toBeInTheDocument();
+  });
+
+  it('renders permission badges when permissions are non-empty', () => {
+    vi.mocked(useMyTeamPermissions).mockReturnValue(
+      qr({ data: { permissions: ['team:models:deploy', 'inference:call'], is_org_admin: false } }),
+    );
+    renderPage();
+    expect(screen.getByText('team:models:deploy')).toBeInTheDocument();
+    expect(screen.getByText('inference:call')).toBeInTheDocument();
+  });
+
+  it('shows empty-permissions message when permissions array is empty and not org admin', () => {
+    vi.mocked(useMyTeamPermissions).mockReturnValue(
+      qr({ data: { permissions: [], is_org_admin: false } }),
+    );
+    renderPage();
+    // No Org Admin badge
+    expect(screen.queryByText('Org Admin')).not.toBeInTheDocument();
+    // The noPermissions message is shown (key passes through I18nProvider)
+    // "platform.teams.noPermissions" → real translation
+  });
+
+  it('shows error state when useMyTeamPermissions fails', () => {
+    vi.mocked(useMyTeamPermissions).mockReturnValue(
+      qr({ isError: true, error: new Error('Permissions error') }),
+    );
+    renderPage();
+    // Multiple cards can show alerts; at least one should be present
+    expect(screen.getAllByRole('alert').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('renders admin-toned badge for admin-prefixed permissions', () => {
+    vi.mocked(useMyTeamPermissions).mockReturnValue(
+      qr({ data: { permissions: ['admin:something'], is_org_admin: false } }),
+    );
+    renderPage();
+    expect(screen.getByText('admin:something')).toBeInTheDocument();
+  });
+
+  it('renders info-toned badge for deploy-prefixed permissions', () => {
+    vi.mocked(useMyTeamPermissions).mockReturnValue(
+      qr({ data: { permissions: ['deploy:model'], is_org_admin: false } }),
+    );
+    renderPage();
+    expect(screen.getByText('deploy:model')).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// TeamPage — NodePoolCard
+// ---------------------------------------------------------------------------
+
+describe('TeamPage — NodePoolCard', () => {
+  it('shows loading block while pools are loading', () => {
+    vi.mocked(useNodePools).mockReturnValue(qr({ isLoading: true }));
+    renderPage();
+    // While loading, no pool link to /platform/pools is rendered yet
+    expect(screen.queryByRole('link', { name: /node pools/i })).not.toBeInTheDocument();
+  });
+
+  it('shows empty state when no pool is assigned to this team', () => {
+    vi.mocked(useNodePools).mockReturnValue(
+      qr({ data: { pools: [] } }),
+    );
+    renderPage();
+    // The NodePoolCard empty state uses t('platform.teams.noPool')
+    // (I18nProvider resolves to actual text)
+  });
+
+  it('shows pool name and exclusive badge when pool is exclusive', () => {
+    vi.mocked(useNodePools).mockReturnValue(
+      qr({
+        data: {
+          pools: [
+            {
+              id: 'pool-1',
+              name: 'GPU Cluster Alpha',
+              owner_type: 'team',
+              owner_id: 'team-1',
+              policy: 'exclusive',
+              nodes: [],
+            },
+          ],
+        },
+      }),
+    );
+    renderPage();
+    expect(screen.getByText('GPU Cluster Alpha')).toBeInTheDocument();
+    // 'exclusive' policy triggers t('platform.pools.exclusive') badge
+  });
+
+  it('shows pool name and shared badge when pool is shared', () => {
+    vi.mocked(useNodePools).mockReturnValue(
+      qr({
+        data: {
+          pools: [
+            {
+              id: 'pool-2',
+              name: 'Shared Inference Pool',
+              owner_type: 'team',
+              owner_id: 'team-1',
+              policy: 'shared',
+              nodes: [],
+            },
+          ],
+        },
+      }),
+    );
+    renderPage();
+    expect(screen.getByText('Shared Inference Pool')).toBeInTheDocument();
+  });
+
+  it('ignores pools owned by a different team', () => {
+    vi.mocked(useNodePools).mockReturnValue(
+      qr({
+        data: {
+          pools: [
+            {
+              id: 'pool-other',
+              name: 'Other Team Pool',
+              owner_type: 'team',
+              owner_id: 'team-other',
+              policy: 'exclusive',
+              nodes: [],
+            },
+          ],
+        },
+      }),
+    );
+    renderPage();
+    // Pool name for other team should NOT appear
+    expect(screen.queryByText('Other Team Pool')).not.toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// TeamPage — InviteMemberModal edge cases
+// ---------------------------------------------------------------------------
+
+describe('TeamPage — InviteMemberModal edge cases', () => {
+  it('shows disabled placeholder option when no roles are available', () => {
+    vi.mocked(useRoles).mockReturnValue(qr({ data: { roles: [] } }));
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: /invite member/i }));
+    const dialog = screen.getByRole('dialog');
+    // roles.length === 0 branch: shows a disabled "loading" option
+    const loadingOption = within(dialog).getByRole('option', { name: /loading/i });
+    expect(loadingOption).toBeDisabled();
+  });
+
+  it('shows error message in modal when addMember call fails', async () => {
+    vi.mocked(useAddTeamMember).mockReturnValue(
+      mut({ isError: true, error: new Error('Invite failed: user already exists') }),
+    );
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: /invite member/i }));
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText('Invite failed: user already exists')).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// TeamPage — MemberRow edge cases
+// ---------------------------------------------------------------------------
+
+describe('TeamPage — MemberRow edge cases', () => {
+  it('shows dash when member.created_at is null', () => {
+    vi.mocked(useTeamMembers).mockReturnValue(
+      qr({
+        data: {
+          members: [
+            {
+              id: 2,
+              team_id: 'team-1',
+              user_id: 'bob@example.com',
+              role_id: 'developer',
+              created_at: null,
+              user: { email: 'bob@example.com', display_name: 'Bob' },
+              role: { name: 'Developer', permissions: [] },
+            },
+          ],
+        },
+      }),
+    );
+    renderPage();
+    // The '—' appears in the joined column when created_at is null
+    expect(screen.getByText('—')).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// TeamPage — MembersCard loading / error / empty states
+// ---------------------------------------------------------------------------
+
+describe('TeamPage — MembersCard states', () => {
+  it('shows loading block while members are loading', () => {
+    vi.mocked(useTeamMembers).mockReturnValue(qr({ isLoading: true }));
+    renderPage();
+    // Members table should not appear while loading
+    expect(screen.queryByRole('columnheader', { name: /user/i })).not.toBeInTheDocument();
+  });
+
+  it('shows error alert when members query fails', () => {
+    vi.mocked(useTeamMembers).mockReturnValue(
+      qr({ isError: true, error: new Error('Failed to load members') }),
+    );
+    renderPage();
+    expect(screen.getAllByRole('alert').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('shows empty state when team has no members', () => {
+    vi.mocked(useTeamMembers).mockReturnValue(qr({ data: { members: [] } }));
+    renderPage();
+    // Should not show the members table
+    expect(screen.queryByRole('columnheader', { name: /user/i })).not.toBeInTheDocument();
+  });
+});

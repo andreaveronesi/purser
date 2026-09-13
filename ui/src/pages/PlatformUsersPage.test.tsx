@@ -144,6 +144,21 @@ describe('PlatformUsersPage — org filter', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Error state
+// ---------------------------------------------------------------------------
+
+describe('PlatformUsersPage — error state', () => {
+  it('shows error message when query fails', () => {
+    mq.usePlatformUsers.mockReturnValue({
+      isLoading: false, isError: true,
+      error: new Error('Failed to load users'), data: undefined, refetch: vi.fn(),
+    });
+    render(<PlatformUsersPage />);
+    expect(screen.getByRole('alert')).toBeDefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Invite button
 // ---------------------------------------------------------------------------
 
@@ -152,5 +167,39 @@ describe('PlatformUsersPage — invite', () => {
     render(<PlatformUsersPage />);
     fireEvent.click(screen.getByTestId('invite-user-btn'));
     expect(screen.getByText(/configure ldap or oidc/i)).toBeDefined();
+  });
+
+  it('closes invite modal when Close is clicked', () => {
+    render(<PlatformUsersPage />);
+    fireEvent.click(screen.getByTestId('invite-user-btn'));
+    expect(screen.getByText(/configure ldap or oidc/i)).toBeDefined();
+    fireEvent.click(screen.getByRole('button', { name: /close/i }));
+    expect(screen.queryByText(/configure ldap or oidc/i)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// User row expansion
+// ---------------------------------------------------------------------------
+
+describe('PlatformUsersPage — user row expansion', () => {
+  it('clicking a row expands the detail panel', () => {
+    mq.usePlatformUsers.mockReturnValue(success([mkUser()]));
+    render(<PlatformUsersPage />);
+    const row = screen.getByRole('row', { name: /alice@acme\.com/i });
+    fireEvent.click(row);
+    // Expanded panel shows "User identifier" — only appears in the expansion panel
+    expect(screen.getByText('User identifier')).toBeDefined();
+    // Also shows the user's full ID in the expansion
+    expect(screen.getAllByText('alice@acme.com').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('clicking a row twice collapses the detail panel', () => {
+    mq.usePlatformUsers.mockReturnValue(success([mkUser()]));
+    render(<PlatformUsersPage />);
+    const row = screen.getByRole('row', { name: /alice@acme\.com/i });
+    fireEvent.click(row); // expand
+    fireEvent.click(row); // collapse
+    expect(screen.queryByText('User identifier')).toBeNull();
   });
 });

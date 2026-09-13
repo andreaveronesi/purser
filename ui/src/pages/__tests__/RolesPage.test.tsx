@@ -37,6 +37,7 @@ import {
   useCreateRole,
   useUpdateRole,
   useDeleteRole,
+  useOrganizations,
 } from '../../hooks/queries';
 
 // ---------------------------------------------------------------------------
@@ -245,5 +246,202 @@ describe('RolesPage — delete role (confirm-first)', () => {
     // A confirm control appears; clicking it fires the delete with the role id.
     fireEvent.click(screen.getByRole('button', { name: /confirm delete/i }));
     expect(deleteMutate).toHaveBeenCalledWith('role-abc123');
+  });
+
+  it('cancel during confirm reverts to normal delete button', () => {
+    const deleteMutate = vi.fn();
+    mockAll([CUSTOM_ROLE], { del: mut({ mutate: deleteMutate }) });
+    renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: /^delete$/i }));
+    // Cancel button appears
+    const cancelBtn = screen.getByRole('button', { name: /cancel/i });
+    fireEvent.click(cancelBtn);
+    // Delete button visible again, mutation never called
+    expect(screen.getByRole('button', { name: /^delete$/i })).toBeDefined();
+    expect(deleteMutate).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// (e) loading and error states
+// ---------------------------------------------------------------------------
+
+describe('RolesPage — loading and error states', () => {
+  it('shows loading block while roles are loading', () => {
+    vi.mocked(useRoles).mockReturnValue(qr({ isLoading: true }));
+    vi.mocked(usePermissionCatalog).mockReturnValue(qr({ data: { permissions: CATALOG } }));
+    vi.mocked(useCreateRole).mockReturnValue(mut());
+    vi.mocked(useUpdateRole).mockReturnValue(mut());
+    vi.mocked(useDeleteRole).mockReturnValue(mut());
+    renderPage();
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+  });
+
+  it('shows error state when roles query fails', () => {
+    vi.mocked(useRoles).mockReturnValue(qr({ isError: true, error: new Error('Server error') }));
+    vi.mocked(usePermissionCatalog).mockReturnValue(qr({ data: { permissions: CATALOG } }));
+    vi.mocked(useCreateRole).mockReturnValue(mut());
+    vi.mocked(useUpdateRole).mockReturnValue(mut());
+    vi.mocked(useDeleteRole).mockReturnValue(mut());
+    renderPage();
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// (f) edit role — opens modal pre-populated with the role's existing data
+// ---------------------------------------------------------------------------
+
+describe('RolesPage — edit role', () => {
+  it('opens edit modal pre-populated with existing name and permissions', () => {
+    mockAll([CUSTOM_ROLE]);
+    renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: /edit/i }));
+    const dialog = screen.getByRole('dialog');
+
+    // Name field should have the existing role name
+    const nameInput = within(dialog).getByLabelText('Role name') as HTMLInputElement;
+    expect(nameInput.value).toBe('ML Engineer');
+
+    // Pre-selected permissions should be checked
+    expect(within(dialog).getByRole('checkbox', { name: /team:models:deploy/ })).toBeChecked();
+    expect(within(dialog).getByRole('checkbox', { name: /inference:call/ })).toBeChecked();
+  });
+
+  it('submits update with modified name and permissions', async () => {
+    const updateMutate = vi.fn();
+    mockAll([CUSTOM_ROLE], { update: mut({ mutate: updateMutate }) });
+    renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: /edit/i }));
+    const dialog = screen.getByRole('dialog');
+
+    fireEvent.change(within(dialog).getByLabelText('Role name'), { target: { value: 'Senior ML Engineer' } });
+    // Uncheck one permission
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: /inference:call/ }));
+
+    fireEvent.click(within(dialog).getByRole('button', { name: /save role/i }));
+
+    expect(updateMutate).toHaveBeenCalledTimes(1);
+    const arg = updateMutate.mock.calls[0][0];
+    expect(arg.data.name).toBe('Senior ML Engineer');
+    expect(arg.data.permissions).not.toContain('inference:call');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// (g) RolesOrgPicker — no orgId in URL (governance nav path)
+// ---------------------------------------------------------------------------
+
+function renderPicker() {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={client}>
+      <MemoryRouter initialEntries={['/platform/roles']}>
+        <I18nProvider>
+          <Routes>
+            <Route path="/platform/roles" element={<RolesPage />} />
+            <Route path="/platform/orgs/:orgId/roles" element={<div>ROLES_FOR_ORG</div>} />
+          </Routes>
+        </I18nProvider>
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// (h) RoleRow — permission display edge cases
+// ---------------------------------------------------------------------------
+
+describe('RolesPage — RoleRow permission display', () => {
+  it('shows dash when role has zero permissions', () => {
+    const emptyRole: CustomRole = { ...CUSTOM_ROLE, id: 'empty', permissions: [] };
+    mockAll([emptyRole]);
+    renderPage();
+    // The '—' span appears when permissions.length === 0
+    const dash = screen.getByText('—');
+    expect(dash).toBeInTheDocument();
+  });
+
+  it('shows "+N more" when role has more than 3 permissions', () => {
+    const bigRole: CustomRole = {
+      ...CUSTOM_ROLE,
+      id: 'big',
+      permissions: ['p:a', 'p:b', 'p:c', 'p:d', 'p:e'],
+    };
+    mockAll([bigRole]);
+    renderPage();
+    // First 3 shown as inline-code, 2 extras → "+2 more" text
+    expect(screen.getByText(/\+2/)).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// (i) RolesOrgPicker — error state
+// ---------------------------------------------------------------------------
+
+describe('RolesPage — org picker error state', () => {
+  it('shows error state when useOrganizations fails', () => {
+    vi.mocked(useOrganizations).mockReturnValue(
+      qr({ isError: true, error: new Error('Network error') }),
+    );
+    vi.mocked(useRoles).mockReturnValue(qr({ data: { roles: [] } }));
+    vi.mocked(usePermissionCatalog).mockReturnValue(qr({ data: { permissions: [] } }));
+    vi.mocked(useCreateRole).mockReturnValue(mut());
+    vi.mocked(useUpdateRole).mockReturnValue(mut());
+    vi.mocked(useDeleteRole).mockReturnValue(mut());
+
+    renderPicker();
+    expect(screen.getAllByRole('alert').length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe('RolesPage — org picker (no orgId in URL)', () => {
+  it('renders org picker when no orgId param', () => {
+    vi.mocked(useOrganizations).mockReturnValue(
+      qr({ data: { organizations: [{ id: 'org-1', name: 'Acme', slug: 'acme', created_at: '', updated_at: '' }] } }),
+    );
+    // Must also provide the other mocks (used in RolesManager but not in this render path)
+    vi.mocked(useRoles).mockReturnValue(qr({ data: { roles: [] } }));
+    vi.mocked(usePermissionCatalog).mockReturnValue(qr({ data: { permissions: CATALOG } }));
+    vi.mocked(useCreateRole).mockReturnValue(mut());
+    vi.mocked(useUpdateRole).mockReturnValue(mut());
+    vi.mocked(useDeleteRole).mockReturnValue(mut());
+
+    renderPicker();
+    // Picker shows a select with the org name
+    expect(screen.getByRole('option', { name: 'Acme' })).toBeInTheDocument();
+  });
+
+  it('navigates to org-scoped roles when an org is selected', () => {
+    vi.mocked(useOrganizations).mockReturnValue(
+      qr({ data: { organizations: [{ id: 'org-navigate', name: 'Navigate Corp', slug: 'nav', created_at: '', updated_at: '' }] } }),
+    );
+    vi.mocked(useRoles).mockReturnValue(qr({ data: { roles: [] } }));
+    vi.mocked(usePermissionCatalog).mockReturnValue(qr({ data: { permissions: CATALOG } }));
+    vi.mocked(useCreateRole).mockReturnValue(mut());
+    vi.mocked(useUpdateRole).mockReturnValue(mut());
+    vi.mocked(useDeleteRole).mockReturnValue(mut());
+
+    renderPicker();
+    const select = screen.getByRole('combobox');
+    fireEvent.change(select, { target: { value: 'org-navigate' } });
+    expect(screen.getByText('ROLES_FOR_ORG')).toBeInTheDocument();
+  });
+
+  it('shows empty state when there are no orgs', () => {
+    vi.mocked(useOrganizations).mockReturnValue(
+      qr({ data: { organizations: [] } }),
+    );
+    vi.mocked(useRoles).mockReturnValue(qr({ data: { roles: [] } }));
+    vi.mocked(usePermissionCatalog).mockReturnValue(qr({ data: { permissions: [] } }));
+    vi.mocked(useCreateRole).mockReturnValue(mut());
+    vi.mocked(useUpdateRole).mockReturnValue(mut());
+    vi.mocked(useDeleteRole).mockReturnValue(mut());
+
+    renderPicker();
+    expect(screen.getByText(/no organizations yet/i)).toBeInTheDocument();
   });
 });

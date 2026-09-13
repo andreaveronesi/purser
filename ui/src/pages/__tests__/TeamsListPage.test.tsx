@@ -148,6 +148,24 @@ describe('TeamsListPage', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Error and loading states for TeamsListPage
+// ---------------------------------------------------------------------------
+
+describe('TeamsListPage — loading and error states', () => {
+  it('shows no table while loading', () => {
+    mq.useTeams.mockReturnValue({ data: undefined, isLoading: true, isError: false, error: null, refetch: vi.fn() });
+    const { container } = renderTeamsList();
+    expect(container.querySelector('table')).toBeNull();
+  });
+
+  it('shows error alert when teams query fails', () => {
+    mq.useTeams.mockReturnValue({ data: undefined, isLoading: false, isError: true, error: new Error('Server down'), refetch: vi.fn() });
+    renderTeamsList();
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // OrganizationsPage → "View Teams" navigation target exists
 // ---------------------------------------------------------------------------
 

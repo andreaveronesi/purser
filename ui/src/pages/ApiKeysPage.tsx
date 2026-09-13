@@ -250,7 +250,7 @@ function KeyRow({ apiKey, t }: { apiKey: ApiKey; t: TFunc }) {
           {apiKey.monthlyQuota === null ? (
             <span className="muted">{t('settings.usage.unlimited')}</span>
           ) : (
-            <Meter used={apiKey.usedThisMonth} total={apiKey.monthlyQuota} label={apiKey.name} unit="req" />
+            <Meter used={apiKey.usedThisMonth} total={apiKey.monthlyQuota ?? 0} label={apiKey.name} unit="req" />
           )}
         </td>
         <td>
