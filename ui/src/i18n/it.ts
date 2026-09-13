@@ -113,6 +113,8 @@ export const it: Record<StringKey, string> = {
   'fleet.confirm.removeTitle': 'Rimuovere il nodo dalla flotta?',
   'fleet.confirm.removeBody': 'Il nodo {node} verrà dismesso. Questa operazione non può essere annullata.',
   'fleet.metrics.stale': 'Metriche live non disponibili — mostrati ultimi valori noti',
+  'fleet.nodes.readyOf': '{ready} di {total} pronti',
+  'fleet.node.retired': 'Ritirato',
 
   // widget stato reconciler
   'fleet.reconciler.title': 'Reconciler',

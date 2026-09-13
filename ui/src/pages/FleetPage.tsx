@@ -703,9 +703,11 @@ function NodeRow({
   const [showDrainModal, setShowDrainModal] = useState(false);
   const [showRemoveModal, setShowRemoveModal] = useState(false);
 
+  const isRetired = node.profile.state === 'decommissioned';
+
   return (
     <>
-      <tr>
+      <tr style={isRetired ? { opacity: 0.55 } : undefined}>
         <th
           scope="row"
           className="node-cell"
@@ -741,6 +743,14 @@ function NodeRow({
         </th>
         <td>
           <StatusPill state={node.profile.state} />
+          {isRetired && (
+            <span
+              className="muted"
+              style={{ marginLeft: '0.4rem', fontSize: '0.75rem' }}
+            >
+              {t('fleet.node.retired')}
+            </span>
+          )}
         </td>
         <td className="hw-cell">{hardwareSummary(node)}</td>
         <td>
@@ -911,38 +921,62 @@ export function FleetPage() {
             }
           />
         )}
-        {nodes.data && nodes.data.length > 0 && (
-          <div className="table-wrap">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th scope="col">{t('fleet.col.node')}</th>
-                  <th scope="col">{t('fleet.col.state')}</th>
-                  <th scope="col">{t('fleet.col.hardware')}</th>
-                  <th scope="col">{t('fleet.col.load')}</th>
-                  <th scope="col">{t('fleet.col.link')}</th>
-                  <th scope="col">{t('fleet.col.actions')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {nodes.data.map((n) => (
-                  <NodeRow
-                    key={n.profile.nodeId}
-                    node={n}
-                    liveMetrics={liveByNode[n.profile.nodeId] ?? null}
-                    isExpanded={expandedNodeId === n.profile.nodeId}
-                    onToggle={() =>
-                      setExpandedNodeId(
-                        expandedNodeId === n.profile.nodeId ? null : n.profile.nodeId,
-                      )
-                    }
-                    t={t}
-                  />
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        {nodes.data && nodes.data.length > 0 && (() => {
+          // Sort: ready/running/degraded first; decommissioned/unreachable last.
+          // Operate on a copy — never mutate the query-cache reference.
+          const NODE_ORDER: Record<string, number> = {
+            ready: 0,
+            running: 0,
+            degraded: 1,
+            unreachable: 2,
+            decommissioned: 3,
+          };
+          const sorted = [...nodes.data].sort(
+            (a, b) =>
+              (NODE_ORDER[a.profile.state] ?? 1) - (NODE_ORDER[b.profile.state] ?? 1),
+          );
+          const readyCount = nodes.data.filter((n) => n.profile.state === 'ready').length;
+          return (
+            <>
+              <p
+                className="table-caption muted"
+                style={{ fontSize: '0.8rem', marginBottom: '0.5rem' }}
+              >
+                {t('fleet.nodes.readyOf', { ready: readyCount, total: nodes.data.length })}
+              </p>
+              <div className="table-wrap">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th scope="col">{t('fleet.col.node')}</th>
+                      <th scope="col">{t('fleet.col.state')}</th>
+                      <th scope="col">{t('fleet.col.hardware')}</th>
+                      <th scope="col">{t('fleet.col.load')}</th>
+                      <th scope="col">{t('fleet.col.link')}</th>
+                      <th scope="col">{t('fleet.col.actions')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sorted.map((n) => (
+                      <NodeRow
+                        key={n.profile.nodeId}
+                        node={n}
+                        liveMetrics={liveByNode[n.profile.nodeId] ?? null}
+                        isExpanded={expandedNodeId === n.profile.nodeId}
+                        onToggle={() =>
+                          setExpandedNodeId(
+                            expandedNodeId === n.profile.nodeId ? null : n.profile.nodeId,
+                          )
+                        }
+                        t={t}
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          );
+        })()}
       </Card>
     </div>
   );

@@ -22,7 +22,7 @@ ENROLLED ──► READY ──► RUNNING
 | `NODE_STATE_READY` | Node is enrolled and available for new deployments. |
 | `NODE_STATE_RUNNING` | Node is actively serving at least one deployment. |
 | `NODE_STATE_DRAINING` | Node has been cordoned; new deployments will not be scheduled here. Existing deployments are not migrated automatically. |
-| `NODE_STATE_DECOMMISSIONED` | Node has been removed from the active fleet. Certificates are revoked. The record is retained in the registry. |
+| `NODE_STATE_DECOMMISSIONED` | Node has been removed from the active fleet. Certificates are revoked. The record is retained in the registry for history. In the operator dashboard these nodes are labelled **Retired** and sorted to the bottom of the Fleet table. |
 
 ---
 

@@ -119,6 +119,8 @@ export const en = {
   'fleet.confirm.removeTitle': 'Remove node from fleet?',
   'fleet.confirm.removeBody': 'Node {node} will be decommissioned. This cannot be undone.',
   'fleet.metrics.stale': 'Live metrics unavailable — showing last known values',
+  'fleet.nodes.readyOf': '{ready} of {total} ready',
+  'fleet.node.retired': 'Retired',
 
   // reconciler status widget
   'fleet.reconciler.title': 'Reconciler',
