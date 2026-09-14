@@ -7,6 +7,77 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+> **v0.7 (in progress) — "UI Authenticity, UX & Access Control"** — hardens the
+> operator dashboard so every displayed value is real, restructures navigation
+> around the fleet, and wires end-to-end login + role-based access.
+
+### Added — Authentication & access control
+- **Login UI** — `/login` page with OIDC SSO button and LDAP form; global
+  `AuthContext` (loads `GET /api/v1/platform/users/me` on mount), `ProtectedRoute`
+  guard, and a topbar showing the current user + logout
+- **Session-cookie RBAC** — a browser session cookie now carries the resolved
+  role through `rbacMiddleware`, so `/api/v1/*` calls authenticate with the cookie
+  alone (previously returned 401; role saved in the `oidc_sessions` row at login)
+- **Role-filtered navigation** — the five nav sections are shown per role
+  (Inference: all authenticated; Platform/Observability/Governance: org/platform
+  admin; Administration: platform admin only); create/delete actions are hidden
+  when the user lacks the permission
+- **Dev-mode banner** — when no OIDC/LDAP is configured the UI stays fully open
+  (open demo) and shows a "development mode: authentication disabled" banner
+- **Granular RBAC enforcement** — `routePermission` extended to ~26 org/team/
+  member/role/billing/GDPR/SLO routes (previously binary admin-only checks)
+- **Complete `/me`** — returns role, email, `is_platform_admin`, `is_org_admin`
+
+### Added — Dashboard & navigation
+- **Dashboard** is the new landing route (`/`) — cluster capacity, reconciler,
+  cluster status, SLO, and a clickable fleet summary
+- **Fleet page** is now node-focused; onboarding moved to a dedicated `/onboarding`
+  route; the four cluster-health cards extracted into a shared `ClusterCards` module
+
+### Fixed — Data authenticity (the dashboard no longer shows fabricated data)
+- **Metrics SSE fabrication** — `/api/v1/metrics` streamed phantom nodes with
+  impossible telemetry (e.g. "43 tok/s live" + 22 GB VRAM on an idle CPU-only
+  cluster). Now enumerates only registry nodes, zero-fills silent ones, and prunes
+  stale samples (30 s TTL); an idle cluster correctly reports 0
+- **camelCase type migration** — ~14 response interfaces still declared snake_case
+  while the fetch layer camelizes every response, so billing/team/pool/approval
+  pages silently read `undefined` (crashes on `.toFixed`, blank tables, a broken
+  "remove member" action). Migrated to camelCase + a regression-guard test that
+  fails if a snake_case field reappears in a response type
+- **Real capacity** — `/cluster/health` now returns real aggregate RAM/VRAM from
+  registry nodes (Fleet meters showed 0/0 despite 15 GB/node)
+- **Deployment errors surfaced** — the Deployments page now shows `detail.error`
+  ("host … not ready") instead of a mute "0 nodes"; no more fabricated `createdAt`
+- **Enrollment commands** — `/join-token` returns `control_plane_url` (wired from
+  `PURSER_PUBLIC_ADDR`, with a browser-origin fallback); install snippets are no
+  longer emitted with an empty `--control-plane`
+
+### Changed — Usability
+- **What-if Planner** result panel reframed as two labelled scenarios (with
+  simulated nodes / current fleet) instead of a confusing "Infeasible / Feasible"
+- **Explanatory empty states** on Organizations, Node Pools, Data Planes, Platform
+  Users (with an OIDC/LDAP configuration link), and Roles — modelled on the
+  Playground's clear call-to-action
+- **Deployments** split into Active / Not-serving sections; "unavailable" relabeled
+  "Not serving"; the ambiguous "The plan" button relabeled "Configure and start";
+  undeploy hidden on already-stopped deployments
+- **Playground** no longer offers a phantom hardcoded model; the chat form is
+  disabled when nothing is deployed
+- Enterprise gate, mock-engine estimate disclaimer, and "nothing running" idle
+  banner added; reconciler config panel CSS wrapping fixed
+
+### Known limitations (open, non-blocking — candidates for v0.8)
+- **LDAP-only dev-mode detection** — the UI infers dev-mode from `!config.oidc`,
+  so an LDAP-only deployment (no OIDC) is treated as dev-mode. Fix needs the
+  backend to expose `ldap_configured` in `/config` so the UI can use
+  `!config.oidc && !config.ldap`
+- **Permission catalog gaps** — `GET /platform/users`, `GET /platform/orgs/{id}/
+  billing`, and the GDPR erasure routes are mapped to broader proxy permissions;
+  dedicated `platform:users:view`, `org:billing:view`, `platform:gdpr:manage`
+  permissions should be added to `permissions/permissions.go`
+- **Org breadcrumb** — Teams / Team pages show the org UUID instead of its name
+  (resolving it needs an extra `useOrganization(orgId)` query)
+
 ## [0.6.0] - 2026-09-12
 
 > **v0.6 — "Observability & Platform Hardening"** — feature release (alpha; GPU
