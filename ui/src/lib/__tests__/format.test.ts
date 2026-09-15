@@ -4,12 +4,52 @@ import {
   clamp,
   formatTokenCount,
   gb,
+  integer,
   percent,
   range,
   relativeTime,
   timeUntil,
   tokS,
 } from '../format';
+
+// ---------------------------------------------------------------------------
+// integer — grouped, and identical on every machine
+// ---------------------------------------------------------------------------
+describe('integer', () => {
+  it('groups thousands with a comma', () => {
+    expect(integer(8400)).toBe('8,400');
+  });
+
+  it('groups millions', () => {
+    expect(integer(1234567)).toBe('1,234,567');
+  });
+
+  it('leaves values below a thousand ungrouped', () => {
+    expect(integer(0)).toBe('0');
+    expect(integer(999)).toBe('999');
+  });
+
+  it('handles negatives', () => {
+    expect(integer(-8400)).toBe('-8,400');
+  });
+
+  it('rounds rather than emitting decimals', () => {
+    expect(integer(8400.6)).toBe('8,401');
+  });
+
+  // The reason this helper exists. `(8400).toLocaleString()` and
+  // `new Intl.NumberFormat().format(8400)` both read the HOST's locale: they
+  // yield '8,400' on an en-US machine and '8400' on an it-IT one, so the same
+  // build renders differently per developer and per operator, and any test
+  // asserting the output passes or fails depending on whose laptop runs it.
+  // format.ts is locale-neutral by design; this guards that contract.
+  it('does not follow the ambient locale', () => {
+    const ambient = new Intl.NumberFormat().format(8400);
+    expect(integer(8400)).toBe('8,400');
+    // Holds whether or not the host happens to agree.
+    if (ambient !== '8,400') expect(integer(8400)).not.toBe(ambient);
+  });
+});
 
 // ---------------------------------------------------------------------------
 // gb

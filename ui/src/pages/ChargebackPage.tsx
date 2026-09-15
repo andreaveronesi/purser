@@ -33,6 +33,7 @@ import {
 import { api } from '../api/client';
 import { ApiError } from '../api/http';
 import { errorMessage } from '../lib/errors';
+import { integer } from '../lib/format';
 import type {
   BillingForecastEntry,
   BillingTenantUsage,
@@ -129,8 +130,12 @@ function StatTile({ label, value }: { label: string; value: string | number }) {
 // Number formatters
 // ---------------------------------------------------------------------------
 
+// Delegates to the locale-neutral helper: the bare `new Intl.NumberFormat()`
+// this used to call read the host machine's locale, so these figures rendered
+// differently per operator (and the test asserting "8,400" only passed on an
+// en-US machine).
 function fmtNum(n: number): string {
-  return new Intl.NumberFormat().format(n);
+  return integer(n);
 }
 
 // ---------------------------------------------------------------------------

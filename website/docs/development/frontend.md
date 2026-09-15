@@ -7,14 +7,16 @@ until someone opens the dashboard on a large display.
 
 ## Node version
 
-The UI requires **Node 22**. It is pinned in `ui/.nvmrc` and declared in
-`ui/package.json` (`engines`), and CI uses the same major.
+The UI targets **Node 22**, pinned in `ui/.nvmrc` and declared in
+`ui/package.json` (`engines`) to match CI.
 
-Newer majors are not merely untested — on Node 25, `jsdom` and `vitest` disagree
-about `localStorage` and **roughly 360 tests fail before any code change**, while
-`tsc` and `vite build` still pass. If you see a wall of
-`localStorage.getItem is not a function`, check your Node version before you
-start debugging the application.
+The pin documents the supported version; it is no longer load-bearing for the
+test suite. From Node 22 onward Node ships its own global `localStorage`, and
+because that implementation is file-backed it is inert without a valid
+`--localstorage-file` — on Node 25 it shadowed jsdom's Storage and roughly 360
+tests failed before any code change. `src/test/setup.ts` now installs a
+deterministic in-memory Storage instead of trusting whatever the host provides,
+so the suite passes on Node 22 and 25 alike.
 
 ```bash
 cd ui
@@ -97,6 +99,24 @@ you want.
 
 Line length is still bounded where it matters: prose caps are expressed in `ch`
 (character count), not pixels, because that is what readability depends on.
+
+## Formatting is locale-neutral
+
+`src/lib/format.ts` opens by stating the rule: helpers are locale-neutral, so the
+same value renders identically regardless of UI language. Use them.
+
+Do **not** call `n.toLocaleString()` or `new Intl.NumberFormat()` with no locale
+argument. Both read the *host machine's* locale, which has two consequences: the
+identical build shows `8,400` to one operator and `8400` to another, and any test
+asserting that output passes or fails depending on whose machine runs it. Pass an
+explicit locale, or add a helper to `format.ts` — `integer()` is the grouped
+whole-number case.
+
+!!! note "Known gap"
+    Sixteen call sites still format dates and counts through bare
+    `toLocaleString()` / `toLocaleDateString()`. They break no test, because no
+    test asserts their output, but they do mean a dashboard set to English shows
+    dates in the operator's OS locale. Migrating them is open work.
 
 ## Numbers in tables
 

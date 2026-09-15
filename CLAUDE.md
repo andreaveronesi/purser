@@ -69,9 +69,13 @@ and verifies SHA256 checksums before extracting. `--dry-run` shows the plan;
 does **not** install python3, nfpm, or Node — it names those in its summary.
 
 **UI (`ui/`) — Node 22 and Tailwind v4.** Node is pinned in `ui/.nvmrc` +
-`engines`; CI uses the same major. On Node 25 about **360 tests fail before any
-code change** (jsdom/vitest disagree on `localStorage`) while typecheck and build
-still pass — check `node -v` before debugging a wall of red. Styling is
+`engines` to match CI. `src/test/setup.ts` installs an in-memory Web Storage
+rather than trusting the host's: Node ≥22 ships its own file-backed
+`localStorage` which is inert without `--localstorage-file`, and on Node 25 it
+shadowed jsdom's and broke ~360 tests. Never format with bare
+`toLocaleString()` / `new Intl.NumberFormat()` — those read the *machine's*
+locale, so output differs per developer; `src/lib/format.ts` is locale-neutral by
+design (`integer()` for grouped counts). Styling is
 **Tailwind v4, CSS-first**: no `tailwind.config.js`; all design tokens live in
 `@theme` in `ui/src/styles/tokens.css`, where each one yields both a CSS variable
 and a utility class. Names must follow Tailwind's namespaces — a colour is
