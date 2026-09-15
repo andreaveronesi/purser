@@ -50,9 +50,9 @@ export function DashboardPage() {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            background: 'var(--surface-2)',
-            border: '1px solid var(--border)',
-            borderRadius: 'var(--radius)',
+            background: 'var(--color-surface-2)',
+            border: '1px solid var(--color-border)',
+            borderRadius: 'var(--radius-md)',
             padding: '16px 20px',
             cursor: 'pointer',
             transition: 'border-color 150ms ease',
@@ -80,7 +80,7 @@ export function DashboardPage() {
           </div>
           <span
             aria-hidden="true"
-            style={{ color: 'var(--text-muted)', fontSize: '1.2em', marginLeft: '12px' }}
+            style={{ color: 'var(--color-text-muted)', fontSize: '1.2em', marginLeft: '12px' }}
           >
             →
           </span>

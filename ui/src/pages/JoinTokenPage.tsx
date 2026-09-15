@@ -66,7 +66,7 @@ export function JoinTokenPage() {
   const expired = join ? new Date(join.expiresAt).getTime() < Date.now() : false;
 
   return (
-    <div className="page">
+    <div className="page page--narrow">
       <PageHeader title={t('join.title')} subtitle={t('join.subtitle')} />
 
       {/* --- Join token card ------------------------------------------------ */}

@@ -19,8 +19,8 @@ body {
   font-family: var(--font-sans);
   font-size: 15px;
   line-height: 1.5;
-  color: var(--text);
-  background: var(--bg);
+  color: var(--color-text);
+  background: var(--color-bg);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
@@ -43,7 +43,7 @@ ol {
 }
 
 a {
-  color: var(--accent);
+  color: var(--color-accent);
   text-decoration: none;
 }
 a:hover {
@@ -52,7 +52,7 @@ a:hover {
 
 /* Visible focus for every interactive element (keyboard accessibility). */
 :focus-visible {
-  outline: 2px solid var(--focus);
+  outline: 2px solid var(--color-focus);
   outline-offset: 2px;
   border-radius: var(--radius-sm);
 }
@@ -92,10 +92,10 @@ a:hover {
   left: 12px;
   top: -60px;
   z-index: 100;
-  background: var(--accent);
-  color: var(--accent-contrast);
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
   padding: 10px 16px;
-  border-radius: var(--radius);
+  border-radius: var(--radius-md);
   transition: top 0.15s ease;
 }
 .skip-link:focus {
@@ -104,8 +104,8 @@ a:hover {
 }
 
 .sidebar {
-  background: var(--surface);
-  border-right: 1px solid var(--border);
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-border);
   padding: 20px 14px;
   display: flex;
   flex-direction: column;
@@ -128,8 +128,8 @@ a:hover {
   width: 38px;
   height: 38px;
   border-radius: 10px;
-  background: var(--accent);
-  color: var(--accent-contrast);
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
   font-weight: 800;
   font-size: 20px;
   flex: none;
@@ -145,7 +145,7 @@ a:hover {
 }
 .brand__tag {
   font-size: 11.5px;
-  color: var(--text-muted);
+  color: var(--color-text-muted);
 }
 
 .nav {
@@ -159,7 +159,7 @@ a:hover {
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--text-muted);
+  color: var(--color-text-muted);
   /* left 10px + 2px transparent border = 12px total, same as inactive links */
   padding: 0 12px 6px 10px;
   margin-top: 8px;
@@ -170,8 +170,8 @@ a:hover {
 /* Active section: accent border on the label only — one clear signal, not
    per-item noise. Items inside also get a subtle 4px extra indent. */
 .nav__section--active .nav__section-label {
-  border-left-color: var(--accent);
-  color: var(--text);
+  border-left-color: var(--color-accent);
+  color: var(--color-text);
 }
 .nav__section--active .nav__link {
   padding-left: 16px;
@@ -187,18 +187,18 @@ a:hover {
   align-items: center;
   gap: 11px;
   padding: 9px 12px;
-  border-radius: var(--radius);
-  color: var(--text);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
   font-weight: 500;
   font-size: 14px;
 }
 .nav__link:hover {
-  background: var(--surface-2);
+  background: var(--color-surface-2);
   text-decoration: none;
 }
 .nav__link--active {
-  background: var(--accent);
-  color: var(--accent-contrast);
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
 }
 .nav__icon {
   display: inline-flex;
@@ -220,8 +220,8 @@ a:hover {
   align-items: center;
   gap: 12px;
   padding: 12px 28px;
-  border-bottom: 1px solid var(--border);
-  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  border-bottom: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--color-surface) 82%, transparent);
   backdrop-filter: blur(6px);
   position: sticky;
   top: 0;
@@ -246,12 +246,27 @@ a:hover {
 
 /* --- Page scaffolding ----------------------------------------------------- */
 
+/* Width is a property of the PAGE, not a single global cap.
+   Previously every page was capped at 1120px and centred, which was two bugs at
+   once: 12 pages carry tables of 6–9 columns that overflowed into horizontal
+   scroll inside that box, while 6 single-column forms sprawled across it. The
+   default is now full width; pages whose content is prose or a form opt IN to a
+   cap via the modifiers below. Only ~6 pages need one, which is why the default
+   is inverted rather than adding a `.page--wide` to the other 26. */
 .page {
-  max-width: 1120px;
-  margin: 0 auto;
+  width: 100%;
   display: flex;
   flex-direction: column;
   gap: 22px;
+}
+/* Forms and guided flows: a cap keeps label/field pairs scannable. */
+.page--narrow {
+  max-width: var(--container-narrow);
+}
+/* Long-form text: capped in ch, because readability is a function of character
+   count, not pixels. Matches the 68ch already used for page subtitles. */
+.page--prose {
+  max-width: var(--container-prose);
 }
 .page--chat {
   height: 100%;
@@ -268,7 +283,7 @@ a:hover {
   letter-spacing: -0.01em;
 }
 .page-header__subtitle {
-  color: var(--text-muted);
+  color: var(--color-text-muted);
   margin-top: 4px;
   max-width: 68ch;
 }
@@ -282,33 +297,38 @@ a:hover {
   display: grid;
   gap: 18px;
 }
+/* Two columns is a minimum, not a maximum: with a fixed `repeat(2, …)` the pair
+   of panels simply grew wider on a big display instead of a third joining them.
+   `auto-fit` with a floor lets the row hold as many columns as fit, and still
+   collapses to one below the floor — which also makes the 900px breakpoint
+   override for this rule redundant rather than load-bearing. */
 .grid--2 {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr));
 }
 .grid--cards {
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
 }
 
 .muted {
-  color: var(--text-muted);
+  color: var(--color-text-muted);
   font-size: 13px;
 }
 .prose {
   max-width: 62ch;
-  color: var(--text);
+  color: var(--color-text);
 }
 .link {
-  color: var(--accent);
+  color: var(--color-accent);
   font-weight: 600;
 }
 
 /* --- Card ----------------------------------------------------------------- */
 
 .card {
-  background: var(--surface);
-  border: 1px solid var(--border);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-card);
 }
 .card__head {
   display: flex;
@@ -316,7 +336,7 @@ a:hover {
   justify-content: space-between;
   gap: 12px;
   padding: 16px 18px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--color-border);
 }
 .card__title {
   font-size: 15px;
@@ -337,7 +357,7 @@ a:hover {
   justify-content: center;
   gap: 7px;
   border: 1px solid transparent;
-  border-radius: var(--radius);
+  border-radius: var(--radius-md);
   font-family: inherit;
   font-weight: 600;
   cursor: pointer;
@@ -361,34 +381,34 @@ a:hover {
   cursor: not-allowed;
 }
 .btn--primary {
-  background: var(--accent);
-  color: var(--accent-contrast);
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
 }
 .btn--primary:hover:not(:disabled) {
-  background: var(--accent-hover);
+  background: var(--color-accent-hover);
 }
 .btn--secondary {
-  background: var(--surface);
-  color: var(--text);
-  border-color: var(--border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  border-color: var(--color-border);
 }
 .btn--secondary:hover:not(:disabled) {
-  background: var(--surface-2);
+  background: var(--color-surface-2);
 }
 .btn--ghost {
   background: transparent;
-  color: var(--text);
+  color: var(--color-text);
 }
 .btn--ghost:hover:not(:disabled) {
-  background: var(--surface-2);
+  background: var(--color-surface-2);
 }
 .btn--danger {
   background: transparent;
-  color: var(--danger-fg);
-  border-color: color-mix(in srgb, var(--danger-fg) 40%, transparent);
+  color: var(--color-danger);
+  border-color: color-mix(in srgb, var(--color-danger) 40%, transparent);
 }
 .btn--danger:hover:not(:disabled) {
-  background: var(--danger-bg);
+  background: var(--color-danger-bg);
 }
 .link-btn:hover {
   text-decoration: none;
@@ -403,14 +423,14 @@ a:hover {
   place-items: center;
   width: 38px;
   height: 38px;
-  border-radius: var(--radius);
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
   cursor: pointer;
 }
 .icon-btn:hover {
-  background: var(--surface-2);
+  background: var(--color-surface-2);
 }
 .icon-btn svg {
   width: 18px;
@@ -429,11 +449,11 @@ a:hover {
   font-weight: 600;
   line-height: 1.7;
 }
-.badge--neutral { background: var(--neutral-bg); color: var(--neutral-fg); }
-.badge--success { background: var(--success-bg); color: var(--success-fg); }
-.badge--warning { background: var(--warning-bg); color: var(--warning-fg); }
-.badge--danger { background: var(--danger-bg); color: var(--danger-fg); }
-.badge--info { background: var(--info-bg); color: var(--info-fg); }
+.badge--neutral { background: var(--color-neutral-bg); color: var(--color-neutral); }
+.badge--success { background: var(--color-success-bg); color: var(--color-success); }
+.badge--warning { background: var(--color-warning-bg); color: var(--color-warning); }
+.badge--danger { background: var(--color-danger-bg); color: var(--color-danger); }
+.badge--info { background: var(--color-info-bg); color: var(--color-info); }
 
 .pill {
   display: inline-flex;
@@ -450,11 +470,11 @@ a:hover {
   border-radius: 50%;
   background: currentColor;
 }
-.pill--neutral { background: var(--neutral-bg); color: var(--neutral-fg); }
-.pill--success { background: var(--success-bg); color: var(--success-fg); }
-.pill--warning { background: var(--warning-bg); color: var(--warning-fg); }
-.pill--danger { background: var(--danger-bg); color: var(--danger-fg); }
-.pill--info { background: var(--info-bg); color: var(--info-fg); }
+.pill--neutral { background: var(--color-neutral-bg); color: var(--color-neutral); }
+.pill--success { background: var(--color-success-bg); color: var(--color-success); }
+.pill--warning { background: var(--color-warning-bg); color: var(--color-warning); }
+.pill--danger { background: var(--color-danger-bg); color: var(--color-danger); }
+.pill--info { background: var(--color-info-bg); color: var(--color-info); }
 
 /* --- Spinner / loading / error / empty ------------------------------------ */
 
@@ -465,8 +485,8 @@ a:hover {
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  border: 2.5px solid var(--border);
-  border-top-color: var(--accent);
+  border: 2.5px solid var(--color-border);
+  border-top-color: var(--color-accent);
   animation: spin 0.7s linear infinite;
 }
 @keyframes spin {
@@ -479,7 +499,7 @@ a:hover {
   align-items: center;
   gap: 10px;
   padding: 24px;
-  color: var(--text-muted);
+  color: var(--color-text-muted);
   justify-content: center;
 }
 
@@ -488,12 +508,12 @@ a:hover {
   align-items: flex-start;
   gap: 14px;
   padding: 16px 18px;
-  border: 1px solid color-mix(in srgb, var(--danger-fg) 35%, var(--border));
-  background: var(--danger-bg);
-  border-radius: var(--radius);
+  border: 1px solid color-mix(in srgb, var(--color-danger) 35%, var(--color-border));
+  background: var(--color-danger-bg);
+  border-radius: var(--radius-md);
 }
 .error-state__icon {
-  color: var(--danger-fg);
+  color: var(--color-danger);
   display: inline-flex;
   flex: none;
   margin-top: 1px;
@@ -504,10 +524,10 @@ a:hover {
 }
 .error-state__title {
   font-weight: 700;
-  color: var(--text);
+  color: var(--color-text);
 }
 .error-state__msg {
-  color: var(--text);
+  color: var(--color-text);
   opacity: 0.85;
   margin-top: 2px;
 }
@@ -524,11 +544,11 @@ a:hover {
   gap: 8px;
   text-align: center;
   padding: 40px 20px;
-  color: var(--text-muted);
+  color: var(--color-text-muted);
 }
 .empty-state__icon {
   display: inline-flex;
-  color: var(--text-muted);
+  color: var(--color-text-muted);
   opacity: 0.6;
 }
 .empty-state__icon svg {
@@ -537,16 +557,16 @@ a:hover {
 }
 .empty-state__title {
   font-weight: 700;
-  color: var(--text);
+  color: var(--color-text);
 }
 
 /* --- Code block / token --------------------------------------------------- */
 
 .codeblock {
   position: relative;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
 }
 .codeblock__pre {
   margin: 0;
@@ -556,7 +576,7 @@ a:hover {
   font-size: 13px;
   line-height: 1.6;
   white-space: pre;
-  color: var(--text);
+  color: var(--color-text);
 }
 .codeblock__actions {
   position: absolute;
@@ -576,24 +596,24 @@ a:hover {
   font-family: var(--font-mono);
   font-size: 13px;
   padding: 10px 12px;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
   overflow-x: auto;
   white-space: nowrap;
 }
 .token-expiry {
   font-size: 12.5px;
-  color: var(--text-muted);
+  color: var(--color-text-muted);
 }
 .token-expiry--danger {
-  color: var(--danger-fg);
+  color: var(--color-danger);
   font-weight: 600;
 }
 .inline-code {
   font-family: var(--font-mono);
   font-size: 12.5px;
-  background: var(--surface-2);
+  background: var(--color-surface-2);
   padding: 2px 6px;
   border-radius: 5px;
 }
@@ -602,13 +622,13 @@ a:hover {
 
 .progress {
   height: 8px;
-  background: var(--surface-2);
+  background: var(--color-surface-2);
   border-radius: 999px;
   overflow: hidden;
 }
 .progress__fill {
   height: 100%;
-  background: var(--accent);
+  background: var(--color-accent);
   border-radius: 999px;
   transition: width 0.4s ease;
 }
@@ -624,7 +644,7 @@ a:hover {
   font-size: 13px;
 }
 .meter__label {
-  color: var(--text-muted);
+  color: var(--color-text-muted);
 }
 .meter__value {
   font-variant-numeric: tabular-nums;
@@ -632,7 +652,7 @@ a:hover {
 }
 .meter__track {
   height: 8px;
-  background: var(--surface-2);
+  background: var(--color-surface-2);
   border-radius: 999px;
   overflow: hidden;
 }
@@ -641,9 +661,9 @@ a:hover {
   border-radius: 999px;
   transition: width 0.4s ease;
 }
-.meter__track--ok .meter__fill { background: var(--success-fg); }
-.meter__track--warning .meter__fill { background: var(--warning-fg); }
-.meter__track--danger .meter__fill { background: var(--danger-fg); }
+.meter__track--ok .meter__fill { background: var(--color-success); }
+.meter__track--warning .meter__fill { background: var(--color-warning); }
+.meter__track--danger .meter__fill { background: var(--color-danger); }
 
 /* --- Forms ---------------------------------------------------------------- */
 
@@ -658,17 +678,17 @@ a:hover {
 }
 .field__hint {
   font-size: 12px;
-  color: var(--text-muted);
+  color: var(--color-text-muted);
 }
 .input,
 .select {
   font-family: inherit;
   font-size: 14px;
   padding: 9px 11px;
-  border-radius: var(--radius);
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
   width: 100%;
 }
 .select--compact {
@@ -682,14 +702,14 @@ a:hover {
 .tabs {
   display: flex;
   gap: 4px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--color-border);
   margin-bottom: 12px;
   flex-wrap: wrap;
 }
 .tab {
   border: none;
   background: transparent;
-  color: var(--text-muted);
+  color: var(--color-text-muted);
   font-family: inherit;
   font-size: 13.5px;
   font-weight: 600;
@@ -699,11 +719,11 @@ a:hover {
   margin-bottom: -1px;
 }
 .tab:hover {
-  color: var(--text);
+  color: var(--color-text);
 }
 .tab--active {
-  color: var(--accent);
-  border-bottom-color: var(--accent);
+  color: var(--color-accent);
+  border-bottom-color: var(--color-accent);
 }
 
 /* --- Modal ---------------------------------------------------------------- */
@@ -720,17 +740,17 @@ a:hover {
 .modal {
   width: 100%;
   max-width: 460px;
-  background: var(--surface);
-  border: 1px solid var(--border);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--shadow-modal);
 }
 .modal:focus {
   outline: none;
 }
 .modal__head {
   padding: 16px 20px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--color-border);
 }
 .modal__title {
   font-size: 16px;
@@ -744,7 +764,7 @@ a:hover {
 }
 .modal__foot {
   padding: 14px 20px;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--color-border);
   display: flex;
   justify-content: flex-end;
   gap: 10px;
@@ -752,15 +772,15 @@ a:hover {
 
 .notice {
   padding: 11px 14px;
-  border-radius: var(--radius);
-  background: var(--info-bg);
-  color: var(--info-fg);
+  border-radius: var(--radius-md);
+  background: var(--color-info-bg);
+  color: var(--color-info);
   font-size: 13.5px;
   font-weight: 500;
 }
 .notice--warning {
-  background: var(--warning-bg);
-  color: var(--warning-fg);
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
 }
 
 /* --- Tables --------------------------------------------------------------- */
@@ -768,32 +788,51 @@ a:hover {
 .table-wrap {
   overflow-x: auto;
 }
-.table {
+/* `.data-table` is an alias, not a second style. ChargebackPage was written
+   against that name, which had no rule anywhere — so its six tables rendered
+   with browser defaults: no full width, no border-collapse, no cell padding.
+   Aliasing fixes them without touching that page's markup. */
+.table,
+.data-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 13.5px;
 }
 .table th,
-.table td {
+.table td,
+.data-table th,
+.data-table td {
   text-align: left;
   padding: 12px 12px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--color-border);
   vertical-align: middle;
 }
-.table thead th {
+/* Measurements must line up as columns. Proportional digits make a fleet of
+   memory figures ragged and hard to compare down the column; tabular figures
+   are the whole reason a numeric table reads as an instrument. The codebase had
+   already reached for this in three places — this generalises it. */
+.table td,
+.data-table td {
+  font-variant-numeric: tabular-nums;
+}
+.table thead th,
+.data-table thead th {
   font-size: 11.5px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--text-muted);
+  color: var(--color-text-muted);
   font-weight: 700;
   white-space: nowrap;
 }
 .table tbody tr:last-child th,
-.table tbody tr:last-child td {
+.table tbody tr:last-child td,
+.data-table tbody tr:last-child th,
+.data-table tbody tr:last-child td {
   border-bottom: none;
 }
-.table tbody tr:hover {
-  background: var(--surface-2);
+.table tbody tr:hover,
+.data-table tbody tr:hover {
+  background: var(--color-surface-2);
 }
 .row--muted {
   opacity: 0.55;
@@ -808,11 +847,11 @@ a:hover {
   gap: 6px;
   flex-wrap: wrap;
   font-size: 12px;
-  color: var(--text-muted);
+  color: var(--color-text-muted);
   margin-top: 3px;
 }
 .hw-cell {
-  color: var(--text-muted);
+  color: var(--color-text-muted);
   max-width: 340px;
 }
 .load-cell {
@@ -834,9 +873,14 @@ a:hover {
 
 /* --- Stats ---------------------------------------------------------------- */
 
+/* `auto-fit` + `1fr` stretches tiles to fill whatever room exists. That was
+   harmless inside a 1120px cap; at full width it would blow each tile out to
+   several hundred pixels around a 22px number, which reads as an error rather
+   than a design. Capping the track at 220px keeps tile size constant and lets
+   the row simply hold more of them as the viewport grows. */
 .stat-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(130px, 220px));
   gap: 14px;
 }
 .stat {
@@ -844,8 +888,8 @@ a:hover {
   flex-direction: column;
   gap: 3px;
   padding: 12px 14px;
-  background: var(--surface-2);
-  border-radius: var(--radius);
+  background: var(--color-surface-2);
+  border-radius: var(--radius-md);
 }
 .stat__value {
   font-size: 22px;
@@ -856,11 +900,11 @@ a:hover {
 .stat__sub {
   font-size: 14px;
   font-weight: 500;
-  color: var(--text-muted);
+  color: var(--color-text-muted);
 }
 .stat__label {
   font-size: 12px;
-  color: var(--text-muted);
+  color: var(--color-text-muted);
 }
 .capacity__hint {
   margin-top: -4px;
@@ -883,9 +927,9 @@ a:hover {
   align-items: center;
   gap: 10px;
   padding: 12px 14px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
   font-weight: 550;
   font-size: 13.5px;
 }
@@ -895,8 +939,8 @@ a:hover {
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  background: var(--accent);
-  color: var(--accent-contrast);
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
   font-weight: 700;
   font-size: 13px;
   flex: none;
@@ -909,7 +953,7 @@ a:hover {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-  color: var(--text-muted);
+  color: var(--color-text-muted);
 }
 .enroll-flow svg {
   width: 16px;
@@ -917,11 +961,11 @@ a:hover {
 }
 .enroll-flow__node {
   padding: 6px 11px;
-  background: var(--surface-2);
-  border-radius: var(--radius);
+  background: var(--color-surface-2);
+  border-radius: var(--radius-md);
   font-size: 12.5px;
   font-weight: 600;
-  color: var(--text);
+  color: var(--color-text);
 }
 
 /* --- Catalog -------------------------------------------------------------- */
@@ -941,7 +985,7 @@ a:hover {
 .model-card__id {
   font-family: var(--font-mono);
   font-size: 12px;
-  color: var(--text-muted);
+  color: var(--color-text-muted);
   margin-top: 2px;
 }
 .model-card__tags {
@@ -959,7 +1003,7 @@ a:hover {
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.03em;
-  color: var(--text-muted);
+  color: var(--color-text-muted);
 }
 .spec-list dd {
   font-size: 13px;
@@ -970,30 +1014,30 @@ a:hover {
   display: flex;
   gap: 11px;
   padding: 12px 14px;
-  border-radius: var(--radius);
+  border-radius: var(--radius-md);
   align-items: flex-start;
 }
-.fit--success { background: var(--success-bg); }
-.fit--warning { background: var(--warning-bg); }
-.fit--danger { background: var(--danger-bg); }
+.fit--success { background: var(--color-success-bg); }
+.fit--warning { background: var(--color-warning-bg); }
+.fit--danger { background: var(--color-danger-bg); }
 .fit__icon {
   display: inline-flex;
   flex: none;
   margin-top: 1px;
 }
-.fit--success .fit__icon { color: var(--success-fg); }
-.fit--warning .fit__icon { color: var(--warning-fg); }
-.fit--danger .fit__icon { color: var(--danger-fg); }
+.fit--success .fit__icon { color: var(--color-success); }
+.fit--warning .fit__icon { color: var(--color-warning); }
+.fit--danger .fit__icon { color: var(--color-danger); }
 .fit__title {
   font-weight: 700;
   font-size: 13.5px;
 }
-.fit--success .fit__title { color: var(--success-fg); }
-.fit--warning .fit__title { color: var(--warning-fg); }
-.fit--danger .fit__title { color: var(--danger-fg); }
+.fit--success .fit__title { color: var(--color-success); }
+.fit--warning .fit__title { color: var(--color-warning); }
+.fit--danger .fit__title { color: var(--color-danger); }
 .fit__detail {
   font-size: 12.5px;
-  color: var(--text);
+  color: var(--color-text);
   opacity: 0.85;
   margin-top: 2px;
 }
@@ -1023,7 +1067,7 @@ a:hover {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--accent);
+  background: var(--color-accent);
 }
 .split-map {
   display: flex;
@@ -1047,7 +1091,7 @@ a:hover {
   font-size: 13px;
 }
 .split-map__bar {
-  background: var(--surface-2);
+  background: var(--color-surface-2);
   border-radius: var(--radius-sm);
   overflow: hidden;
   min-height: 26px;
@@ -1059,12 +1103,12 @@ a:hover {
   padding: 0 8px;
   font-size: 11.5px;
   font-weight: 600;
-  color: var(--accent-contrast);
+  color: var(--color-accent-contrast);
   white-space: nowrap;
   min-width: max-content;
 }
-.split-map__fill--host { background: var(--accent); }
-.split-map__fill--worker { background: color-mix(in srgb, var(--accent) 62%, var(--surface)); }
+.split-map__fill--host { background: var(--color-accent); }
+.split-map__fill--worker { background: color-mix(in srgb, var(--color-accent) 62%, var(--color-surface)); }
 .pipeline-order {
   margin-top: 4px;
 }
@@ -1080,7 +1124,7 @@ a:hover {
   gap: 12px;
 }
 .perf dt {
-  color: var(--text-muted);
+  color: var(--color-text-muted);
   font-size: 13px;
 }
 .perf dd {
@@ -1102,34 +1146,34 @@ a:hover {
 }
 .segmented {
   display: inline-flex;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
   overflow: hidden;
 }
 .segmented__btn {
   border: none;
-  background: var(--surface);
-  color: var(--text);
+  background: var(--color-surface);
+  color: var(--color-text);
   font-family: inherit;
   font-size: 13px;
   font-weight: 600;
   padding: 8px 14px;
   cursor: pointer;
-  border-right: 1px solid var(--border);
+  border-right: 1px solid var(--color-border);
 }
 .segmented__btn:last-child {
   border-right: none;
 }
 .segmented__btn--active {
-  background: var(--accent);
-  color: var(--accent-contrast);
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
 }
 .rollout-state {
   font-weight: 600;
-  color: var(--text-muted);
+  color: var(--color-text-muted);
 }
 .rollout-state--ok {
-  color: var(--success-fg);
+  color: var(--color-success);
 }
 .rollout {
   display: flex;
@@ -1210,7 +1254,11 @@ a:hover {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  max-width: 78%;
+  /* A percentage alone tracked the container: once the page went full width, 78%
+     of a 2200px column would be a 1700px line of text. The ch cap makes the
+     limit about reading — roughly 78 characters — and the percentage still keeps
+     bubbles inset from the edge on narrow screens, whichever binds first. */
+  max-width: min(78%, 78ch);
 }
 .bubble--user {
   align-self: flex-end;
@@ -1221,7 +1269,7 @@ a:hover {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--text-muted);
+  color: var(--color-text-muted);
 }
 .bubble__content {
   padding: 10px 14px;
@@ -1231,12 +1279,12 @@ a:hover {
   line-height: 1.55;
 }
 .bubble--assistant .bubble__content {
-  background: var(--surface-2);
+  background: var(--color-surface-2);
   border-top-left-radius: 4px;
 }
 .bubble--user .bubble__content {
-  background: var(--accent);
-  color: var(--accent-contrast);
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
   border-top-right-radius: 4px;
 }
 .caret {
@@ -1264,10 +1312,10 @@ a:hover {
   font-family: inherit;
   font-size: 14px;
   padding: 11px 13px;
-  border-radius: var(--radius);
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
   line-height: 1.5;
 }
 

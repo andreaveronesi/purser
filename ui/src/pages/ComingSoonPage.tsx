@@ -6,7 +6,7 @@ import { useT } from '../i18n';
 export function ComingSoonPage() {
   const t = useT();
   return (
-    <div className="page">
+    <div className="page page--narrow">
       <div className="page-header">
         <div>
           <h1 className="page-header__title">{t('coming_soon.title')}</h1>

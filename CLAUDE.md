@@ -44,7 +44,7 @@ make test                     # run all test suites
 cd go/controlplane && CGO_ENABLED=0 go build ./... && go test ./... && gofmt -l .
 cargo build -p purser-agent          # set CARGO_TARGET_DIR=/tmp/purser-shared-target
 cargo build -p purser-gateway
-cd ui && npm run typecheck && npm run build
+cd ui && nvm use && npm ci && npm run typecheck && npm test && npm run build
 helm lint deploy/helm/purser
 
 # CP OpenAPI contract is GENERATED — never hand-edit openapi.json.
@@ -67,6 +67,20 @@ that is derived at test time from the `Exempt` flag in `openapi_registry.go`).
 and verifies SHA256 checksums before extracting. `--dry-run` shows the plan;
 `--skip-rust` omits the ~1 GB Rust toolchain for Go-only or docs-only work. It
 does **not** install python3, nfpm, or Node — it names those in its summary.
+
+**UI (`ui/`) — Node 22 and Tailwind v4.** Node is pinned in `ui/.nvmrc` +
+`engines`; CI uses the same major. On Node 25 about **360 tests fail before any
+code change** (jsdom/vitest disagree on `localStorage`) while typecheck and build
+still pass — check `node -v` before debugging a wall of red. Styling is
+**Tailwind v4, CSS-first**: no `tailwind.config.js`; all design tokens live in
+`@theme` in `ui/src/styles/tokens.css`, where each one yields both a CSS variable
+and a utility class. Names must follow Tailwind's namespaces — a colour is
+`--color-text-muted`, never `--text-muted` (that prefix means *font size*). A
+misspelled `var()` fails **silently**, so prefer utilities for new work. Page
+width is opt-in: `.page` is full width, `.page--narrow` / `.page--prose` cap it;
+never cap a page built on `grid--2` / `grid--cards`. Tailwind compiles at build
+time — the CDN "play" script and runtime web fonts are forbidden by the air-gap
+requirement. Full conventions: `website/docs/development/frontend.md`.
 
 **Critical:** `.toolchain/` is git-ignored. In a worktree it won't exist — always
 `source /path/to/main-worktree/env.sh` (absolute path) to get the toolchain on PATH.

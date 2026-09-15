@@ -206,13 +206,13 @@ export function ReconcilerStatusCard({
             margin: 0,
           }}
         >
-          <dt style={{ color: 'var(--text-muted)', fontSize: '0.85em', whiteSpace: 'nowrap', alignSelf: 'center', fontWeight: 500 }}>Interval</dt>
+          <dt style={{ color: 'var(--color-text-muted)', fontSize: '0.85em', whiteSpace: 'nowrap', alignSelf: 'center', fontWeight: 500 }}>Interval</dt>
           <dd style={{ margin: 0, fontFamily: 'var(--font-mono)', fontSize: '0.85em', whiteSpace: 'nowrap' }} data-testid="cfg-interval">{status.config.intervalS}s</dd>
-          <dt style={{ color: 'var(--text-muted)', fontSize: '0.85em', whiteSpace: 'nowrap', alignSelf: 'center', fontWeight: 500 }}>Node timeout</dt>
+          <dt style={{ color: 'var(--color-text-muted)', fontSize: '0.85em', whiteSpace: 'nowrap', alignSelf: 'center', fontWeight: 500 }}>Node timeout</dt>
           <dd style={{ margin: 0, fontFamily: 'var(--font-mono)', fontSize: '0.85em', whiteSpace: 'nowrap' }} data-testid="cfg-node-timeout">{status.config.nodeTimeoutS}s</dd>
-          <dt style={{ color: 'var(--text-muted)', fontSize: '0.85em', whiteSpace: 'nowrap', alignSelf: 'center', fontWeight: 500 }}>Hysteresis</dt>
+          <dt style={{ color: 'var(--color-text-muted)', fontSize: '0.85em', whiteSpace: 'nowrap', alignSelf: 'center', fontWeight: 500 }}>Hysteresis</dt>
           <dd style={{ margin: 0, fontFamily: 'var(--font-mono)', fontSize: '0.85em', whiteSpace: 'nowrap' }}>{status.config.hysteresisS}s</dd>
-          <dt style={{ color: 'var(--text-muted)', fontSize: '0.85em', whiteSpace: 'nowrap', alignSelf: 'center', fontWeight: 500 }}>Action cooldown</dt>
+          <dt style={{ color: 'var(--color-text-muted)', fontSize: '0.85em', whiteSpace: 'nowrap', alignSelf: 'center', fontWeight: 500 }}>Action cooldown</dt>
           <dd style={{ margin: 0, fontFamily: 'var(--font-mono)', fontSize: '0.85em', whiteSpace: 'nowrap' }}>{status.config.actionCooldownS}s</dd>
         </dl>
       </details>
@@ -345,7 +345,7 @@ function ClusterStatusBody({ status, t }: { status: ClusterStatus; t: TFunc }) {
           >
             {statEntries.map(([k, v]) => (
               <div key={k} style={{ display: 'contents' }}>
-                <dt style={{ color: 'var(--text-muted)', fontSize: '0.85em', whiteSpace: 'nowrap', alignSelf: 'center', fontWeight: 500 }}>
+                <dt style={{ color: 'var(--color-text-muted)', fontSize: '0.85em', whiteSpace: 'nowrap', alignSelf: 'center', fontWeight: 500 }}>
                   <code style={{ fontFamily: 'var(--font-mono)', fontSize: '0.85em' }}>{k}</code>
                 </dt>
                 <dd style={{ margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.85em' }}>{v}</dd>

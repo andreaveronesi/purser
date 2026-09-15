@@ -41,7 +41,7 @@ import type { ConfigApplyResult, ConfigDiff } from '../api/types';
 function CodePanel({ title, code, ariaLabel }: { title: string; code: string; ariaLabel: string }) {
   const lines = code.split('\n');
   return (
-    <div style={{ borderRadius: 'var(--radius)', overflow: 'hidden', border: '1px solid #30363d' }}>
+    <div style={{ borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '1px solid #30363d' }}>
       <div
         style={{
           background: '#161b22',
@@ -133,8 +133,8 @@ function ChipList({ items }: { items: unknown[] }) {
           className="inline-code"
           style={{
             fontSize: '0.8em',
-            background: 'var(--surface-2)',
-            border: '1px solid var(--border)',
+            background: 'var(--color-surface-2)',
+            border: '1px solid var(--color-border)',
             borderRadius: 'var(--radius-sm)',
             padding: '2px 8px',
           }}
@@ -316,7 +316,7 @@ export function ConfigCodePage() {
               background: '#0d1117',
               color: '#e6edf3',
               border: '1px solid #30363d',
-              borderRadius: 'var(--radius)',
+              borderRadius: 'var(--radius-md)',
               padding: '0.75rem 1rem',
               resize: 'vertical',
             }}
@@ -384,7 +384,7 @@ export function ConfigCodePage() {
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxWidth: '520px' }}>
             <p style={{ margin: 0 }}>{t('configcode.confirm.body')}</p>
-            <p style={{ margin: 0, color: 'var(--danger-fg)', fontWeight: 600 }}>
+            <p style={{ margin: 0, color: 'var(--color-danger)', fontWeight: 600 }}>
               {t('configcode.confirm.warning')}
             </p>
             <p className="muted" style={{ margin: 0 }}>{t('configcode.confirm.tip')}</p>

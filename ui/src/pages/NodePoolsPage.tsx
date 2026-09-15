@@ -284,7 +284,7 @@ function PoolDetail({ pool }: PoolDetailProps) {
   }
 
   return (
-    <div style={{ padding: '1rem', background: 'var(--color-bg-subtle)', borderTop: '1px solid var(--color-border)' }}>
+    <div style={{ padding: '1rem', background: 'var(--color-surface-2)', borderTop: '1px solid var(--color-border)' }}>
       {/* Nodes section */}
       <p style={{ fontWeight: 600, marginBottom: '0.5rem', fontSize: '0.9em' }}>
         {t('platform.pools.assignNode')}

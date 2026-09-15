@@ -93,8 +93,8 @@ function TierBadge({ tier }: { tier: string }) {
         borderRadius: 'var(--radius-sm)',
         fontSize: '12px',
         fontWeight: 500,
-        color: 'var(--text-muted)',
-        background: 'var(--surface-2)',
+        color: 'var(--color-text-muted)',
+        background: 'var(--color-surface-2)',
       }}
       data-testid="tier-badge"
     >
@@ -132,7 +132,7 @@ function DpStatusPill({ status }: { status: string }) {
 function ConfigSnapshotSummary({ snap }: { snap: Record<string, unknown> | null | undefined }) {
   if (!snap) {
     return (
-      <p style={{ fontSize: '13px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+      <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
         No config snapshot yet — config is pushed automatically every 30 s or via Refresh.
       </p>
     );
@@ -151,11 +151,11 @@ function ConfigSnapshotSummary({ snap }: { snap: Record<string, unknown> | null 
         fontSize: '13px',
       }}
     >
-      <dt style={{ color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', fontSize: '11px' }}>
+      <dt style={{ color: 'var(--color-text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', fontSize: '11px' }}>
         Routing entries
       </dt>
       <dd style={{ margin: 0 }}>{routingCount}</dd>
-      <dt style={{ color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', fontSize: '11px' }}>
+      <dt style={{ color: 'var(--color-text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', fontSize: '11px' }}>
         Auth keys
       </dt>
       <dd style={{ margin: 0 }}>{authCount}</dd>
@@ -172,7 +172,7 @@ const SECTION_LABEL_STYLE: CSSProperties = {
   fontWeight: 700,
   textTransform: 'uppercase',
   letterSpacing: '0.05em',
-  color: 'var(--text-muted)',
+  color: 'var(--color-text-muted)',
   margin: 0,
 };
 
@@ -222,7 +222,7 @@ function DpNodesSection({ dp }: { dp: DataPlane }) {
         />
       )}
       {!isLoading && !isError && rows.length === 0 && (
-        <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: '0 0 10px' }}>
+        <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', margin: '0 0 10px' }}>
           {t('platform.dataplanes.nodes.empty')}
         </p>
       )}
@@ -235,8 +235,8 @@ function DpNodesSection({ dp }: { dp: DataPlane }) {
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '6px',
-                background: 'var(--surface)',
-                border: '1px solid var(--border)',
+                background: 'var(--color-surface)',
+                border: '1px solid var(--color-border)',
                 borderRadius: 'var(--radius-sm)',
                 padding: '3px 8px',
                 fontSize: '13px',
@@ -325,8 +325,8 @@ function DpDetailPanel({ dp, onRefresh }: { dp: DataPlane; onRefresh: () => void
   return (
     <div
       style={{
-        background: 'var(--surface-2)',
-        borderRadius: 'var(--radius)',
+        background: 'var(--color-surface-2)',
+        borderRadius: 'var(--radius-md)',
         padding: '14px 18px',
         display: 'grid',
         gap: '16px',
@@ -356,7 +356,7 @@ function DpDetailPanel({ dp, onRefresh }: { dp: DataPlane; onRefresh: () => void
         )}
       </div>
       {confirmingDelete && (
-        <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0 }}>
+        <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: 0 }}>
           {t('platform.dataplanes.deleteHint')}
         </p>
       )}
@@ -389,7 +389,7 @@ function DpDetailPanel({ dp, onRefresh }: { dp: DataPlane; onRefresh: () => void
       {/* Data plane ID */}
       <div>
         <p style={{ ...SECTION_LABEL_STYLE, marginBottom: '4px' }}>Data Plane ID</p>
-        <code style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', background: 'var(--surface)', padding: '3px 8px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+        <code style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', background: 'var(--color-surface)', padding: '3px 8px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}>
           {dp.id}
         </code>
       </div>
@@ -514,10 +514,10 @@ function DataPlanesEmptyState({ onRegister }: { onRegister?: () => void }) {
         viewBox="0 0 320 120"
         fill="none"
         aria-hidden="true"
-        style={{ color: 'var(--text-muted)' }}
+        style={{ color: 'var(--color-text-muted)' }}
       >
         {/* Control Plane box */}
-        <rect x="4" y="30" width="90" height="60" rx="8" stroke="currentColor" strokeWidth="1.5" fill="var(--surface-2)" />
+        <rect x="4" y="30" width="90" height="60" rx="8" stroke="currentColor" strokeWidth="1.5" fill="var(--color-surface-2)" />
         <text x="49" y="56" textAnchor="middle" fontSize="10" fontWeight="600" fill="currentColor">Control</text>
         <text x="49" y="70" textAnchor="middle" fontSize="10" fontWeight="600" fill="currentColor">Plane</text>
 
@@ -527,7 +527,7 @@ function DataPlanesEmptyState({ onRegister }: { onRegister?: () => void }) {
         <text x="121" y="52" textAnchor="middle" fontSize="9" fill="currentColor">mTLS</text>
 
         {/* Data Plane box */}
-        <rect x="148" y="20" width="100" height="80" rx="8" stroke="#0d9488" strokeWidth="2" fill="var(--surface-2)" />
+        <rect x="148" y="20" width="100" height="80" rx="8" stroke="#0d9488" strokeWidth="2" fill="var(--color-surface-2)" />
         <text x="198" y="50" textAnchor="middle" fontSize="10" fontWeight="700" fill="#0d9488">Data Plane</text>
         <text x="198" y="64" textAnchor="middle" fontSize="9" fill="currentColor">Gateway</text>
         <text x="198" y="78" textAnchor="middle" fontSize="9" fill="currentColor">+ GPU nodes</text>
@@ -538,17 +538,17 @@ function DataPlanesEmptyState({ onRegister }: { onRegister?: () => void }) {
         <text x="269" y="52" textAnchor="middle" fontSize="9" fill="currentColor">/v1/</text>
 
         {/* Clients box */}
-        <rect x="298" y="42" width="18" height="36" rx="4" stroke="currentColor" strokeWidth="1.5" fill="var(--surface-2)" />
+        <rect x="298" y="42" width="18" height="36" rx="4" stroke="currentColor" strokeWidth="1.5" fill="var(--color-surface-2)" />
         <text x="307" y="57" textAnchor="middle" fontSize="8" fill="currentColor">CLI</text>
         <text x="307" y="69" textAnchor="middle" fontSize="8" fill="currentColor">API</text>
       </svg>
 
       <div style={{ textAlign: 'center', maxWidth: '400px' }}>
         <p style={{ fontWeight: 600, marginBottom: '8px' }}>{t('platform.dataplanes.emptyTitle')}</p>
-        <p style={{ color: 'var(--text-muted)', fontSize: '14px', lineHeight: 1.6 }}>
+        <p style={{ color: 'var(--color-text-muted)', fontSize: '14px', lineHeight: 1.6 }}>
           {t('platform.dataplanes.emptyExplain')}
         </p>
-        <p style={{ color: 'var(--text-muted)', fontSize: '14px', lineHeight: 1.6, marginTop: '8px' }}>
+        <p style={{ color: 'var(--color-text-muted)', fontSize: '14px', lineHeight: 1.6, marginTop: '8px' }}>
           {t('platform.dataplanes.emptyNodesNote')}
         </p>
       </div>
@@ -684,10 +684,10 @@ function JoinTokenModal({ result, onClose }: { result: DataPlaneWithToken; onClo
           display: 'flex',
           alignItems: 'center',
           gap: '10px',
-          background: 'var(--surface-2)',
-          borderRadius: 'var(--radius)',
+          background: 'var(--color-surface-2)',
+          borderRadius: 'var(--radius-md)',
           padding: '10px 14px',
-          border: '1px solid var(--border)',
+          border: '1px solid var(--color-border)',
         }}
       >
         <code
@@ -698,7 +698,7 @@ function JoinTokenModal({ result, onClose }: { result: DataPlaneWithToken; onClo
         </code>
         <CopyButton value={result.joinToken} />
       </div>
-      <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+      <p style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>
         Data Plane: <strong>{result.dataplane.name}</strong>
       </p>
     </Modal>
@@ -773,7 +773,7 @@ export function DataPlanesPage() {
                             width: '0.8em',
                             marginRight: '6px',
                             fontSize: '0.65em',
-                            color: 'var(--text-muted)',
+                            color: 'var(--color-text-muted)',
                             transition: 'transform 150ms ease',
                             transform: expandedId === dp.id ? 'rotate(90deg)' : 'rotate(0deg)',
                           }}
@@ -782,7 +782,7 @@ export function DataPlanesPage() {
                         </span>
                         {dp.name}
                         {dp.description && (
-                          <span style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', fontWeight: 400 }}>
+                          <span style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-muted)', fontWeight: 400 }}>
                             {dp.description}
                           </span>
                         )}

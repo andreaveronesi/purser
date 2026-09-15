@@ -258,7 +258,7 @@ describe('SLOPage — compliance colour branches', () => {
     renderPage();
     // 0.72 * 100 = 72.0%
     expect(screen.getByText('72.0%')).toBeInTheDocument();
-    // Colour is applied via inline style: 'var(--danger-fg)' for breached
+    // Colour is applied via inline style: 'var(--color-danger)' for breached
     const span = screen.getByText('72.0%');
     expect(span.style.color).toContain('danger');
   });
@@ -303,7 +303,7 @@ describe('SLOPage — compliance colour branches', () => {
     renderPage();
     // 0.50 * 100 = 50.0%
     expect(screen.getByText('50.0%')).toBeInTheDocument();
-    // status is insufficient_data so neither danger nor success: color = 'var(--text)'
+    // status is insufficient_data so neither danger nor success: color = 'var(--color-text)'
     const span = screen.getByText('50.0%');
     expect(span.style.color).not.toContain('danger');
     expect(span.style.color).not.toContain('success');

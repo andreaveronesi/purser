@@ -64,23 +64,23 @@ function EnterpriseGate() {
         flexDirection: 'column',
         alignItems: 'flex-start',
         gap: '10px',
-        background: 'var(--info-bg)',
-        border: '1px solid color-mix(in srgb, var(--info-fg) 25%, transparent)',
-        borderRadius: 'var(--radius)',
+        background: 'var(--color-info-bg)',
+        border: '1px solid color-mix(in srgb, var(--color-info) 25%, transparent)',
+        borderRadius: 'var(--radius-md)',
         padding: '20px 24px',
       }}
       role="status"
       data-testid="enterprise-gate"
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-        <span aria-hidden="true" style={{ fontSize: '1.25em', lineHeight: 1, color: 'var(--info-fg)' }}>
+        <span aria-hidden="true" style={{ fontSize: '1.25em', lineHeight: 1, color: 'var(--color-info)' }}>
           🔒
         </span>
-        <strong style={{ color: 'var(--info-fg)', fontSize: '1em', fontWeight: 600 }}>
+        <strong style={{ color: 'var(--color-info)', fontSize: '1em', fontWeight: 600 }}>
           {t('chargeback.enterprise.title')}
         </strong>
       </div>
-      <p style={{ margin: 0, color: 'var(--text)', fontSize: '0.9em', lineHeight: 1.5 }}>
+      <p style={{ margin: 0, color: 'var(--color-text)', fontSize: '0.9em', lineHeight: 1.5 }}>
         {t('chargeback.enterprise.desc')}
       </p>
       <a
@@ -88,11 +88,11 @@ function EnterpriseGate() {
         target="_blank"
         rel="noreferrer"
         style={{
-          color: 'var(--info-fg)',
+          color: 'var(--color-info)',
           fontWeight: 600,
           fontSize: '0.875em',
           textDecoration: 'none',
-          borderBottom: '1px solid color-mix(in srgb, var(--info-fg) 40%, transparent)',
+          borderBottom: '1px solid color-mix(in srgb, var(--color-info) 40%, transparent)',
           paddingBottom: '1px',
         }}
       >
@@ -300,7 +300,7 @@ function ModelAdoptionPanel() {
 
   return (
     <Card title={t('chargeback.adoption.title')} action={actions}>
-      <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: 0 }}>
+      <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', marginTop: 0 }}>
         {t('chargeback.adoption.subtitle')}
       </p>
       {isLoading ? (
@@ -373,7 +373,7 @@ function SlaCompliancePanel({ days }: { days: number }) {
 
   return (
     <Card title={t('chargeback.sla.title')} action={actions}>
-      <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: 0 }}>
+      <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', marginTop: 0 }}>
         {t('chargeback.sla.subtitle')}
       </p>
       {isLoading ? (
@@ -542,7 +542,7 @@ function TenantBillingPanel({ days }: { days: number }) {
 
   return (
     <Card title={t('chargeback.tenants.title')}>
-      <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: 0 }}>
+      <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', marginTop: 0 }}>
         {t('chargeback.tenants.subtitle')}
       </p>
       <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: '1rem' }}>

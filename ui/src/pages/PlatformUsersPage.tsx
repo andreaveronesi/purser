@@ -97,8 +97,8 @@ function TeamChips({ teams }: { teams: string[] }) {
             padding: '1px 7px',
             borderRadius: 'var(--radius-sm)',
             fontSize: '12px',
-            background: 'var(--surface-2)',
-            border: '1px solid var(--border)',
+            background: 'var(--color-surface-2)',
+            border: '1px solid var(--color-border)',
             fontFamily: 'var(--font-mono)',
           }}
         >
@@ -138,7 +138,7 @@ function UserRow({ user }: { user: PlatformUser }) {
                 {user.displayName !== user.id ? user.displayName : null}
               </span>
               <code
-                style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--text-muted)' }}
+                style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--color-text-muted)' }}
                 data-testid="user-email"
               >
                 {user.email}
@@ -153,7 +153,7 @@ function UserRow({ user }: { user: PlatformUser }) {
         <td><UserRoleBadge role={user.role} /></td>
         <td>
           {user.lastActiveAt ? (
-            <span style={{ fontSize: '13px', color: isInactive ? 'var(--text-muted)' : undefined }}>
+            <span style={{ fontSize: '13px', color: isInactive ? 'var(--color-text-muted)' : undefined }}>
               {relativeTime(user.lastActiveAt)}
             </span>
           ) : (
@@ -167,8 +167,8 @@ function UserRow({ user }: { user: PlatformUser }) {
           <td colSpan={5} style={{ padding: '0 8px 10px 8px', borderTop: 0 }}>
             <div
               style={{
-                background: 'var(--surface-2)',
-                borderRadius: 'var(--radius)',
+                background: 'var(--color-surface-2)',
+                borderRadius: 'var(--radius-md)',
                 padding: '14px 18px',
                 display: 'grid',
                 gridTemplateColumns: '1fr 1fr',
@@ -176,25 +176,25 @@ function UserRow({ user }: { user: PlatformUser }) {
               }}
             >
               <div>
-                <p style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: '8px' }}>
+                <p style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-muted)', marginBottom: '8px' }}>
                   User identifier
                 </p>
                 <code style={{ fontFamily: 'var(--font-mono)', fontSize: '12px' }}>{user.id}</code>
               </div>
               <div>
-                <p style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: '8px' }}>
+                <p style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-muted)', marginBottom: '8px' }}>
                   Organization
                 </p>
                 <code style={{ fontFamily: 'var(--font-mono)', fontSize: '12px' }}>{user.orgId}</code>
               </div>
               <div>
-                <p style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: '8px' }}>
+                <p style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-muted)', marginBottom: '8px' }}>
                   Teams
                 </p>
                 <TeamChips teams={user.teams} />
               </div>
               <div>
-                <p style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: '8px' }}>
+                <p style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-muted)', marginBottom: '8px' }}>
                   Role
                 </p>
                 <UserRoleBadge role={user.role} />
@@ -227,8 +227,8 @@ function InviteInfoModal({ onClose }: { onClose: () => void }) {
     >
       <div
         style={{
-          background: 'var(--surface)',
-          border: '1px solid var(--border)',
+          background: 'var(--color-surface)',
+          border: '1px solid var(--color-border)',
           borderRadius: 'var(--radius-lg)',
           padding: '24px',
           maxWidth: '420px',
@@ -241,7 +241,7 @@ function InviteInfoModal({ onClose }: { onClose: () => void }) {
           Configure LDAP or OIDC to enable user management. Once an identity provider is connected,
           users will be provisioned automatically on first login.
         </div>
-        <p style={{ marginTop: '14px', fontSize: '13.5px', color: 'var(--text-muted)' }}>
+        <p style={{ marginTop: '14px', fontSize: '13.5px', color: 'var(--color-text-muted)' }}>
           See the platform documentation for LDAP and OIDC integration guides.
         </p>
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '16px' }}>

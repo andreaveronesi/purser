@@ -45,7 +45,7 @@ function hardwareSummary(n: NodeView): string {
 // ---------------------------------------------------------------------------
 // Node expanded details panel — shown as an accordion row below the node row.
 // Design: datasheet-insert style. Small muted labels, monospace for technical
-// values. var(--surface-2) background so it reads as "inside" the parent row.
+// values. var(--color-surface-2) background so it reads as "inside" the parent row.
 // ---------------------------------------------------------------------------
 
 function NodeDetailPanel({ node, t }: { node: NodeView; t: TFunc }) {
@@ -53,8 +53,8 @@ function NodeDetailPanel({ node, t }: { node: NodeView; t: TFunc }) {
   return (
     <div
       style={{
-        background: 'var(--surface-2)',
-        borderRadius: 'var(--radius)',
+        background: 'var(--color-surface-2)',
+        borderRadius: 'var(--radius-md)',
         padding: '12px 16px',
         margin: '4px 0',
       }}
@@ -69,7 +69,7 @@ function NodeDetailPanel({ node, t }: { node: NodeView; t: TFunc }) {
         }}
       >
         {/* Node ID */}
-        <dt style={{ fontSize: '0.75em', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-muted)', alignSelf: 'center', fontWeight: 600 }}>
+        <dt style={{ fontSize: '0.75em', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-text-muted)', alignSelf: 'center', fontWeight: 600 }}>
           Node ID
         </dt>
         <dd style={{ margin: 0 }}>
@@ -79,13 +79,13 @@ function NodeDetailPanel({ node, t }: { node: NodeView; t: TFunc }) {
         </dd>
 
         {/* Hostname */}
-        <dt style={{ fontSize: '0.75em', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-muted)', alignSelf: 'center', fontWeight: 600 }}>
+        <dt style={{ fontSize: '0.75em', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-text-muted)', alignSelf: 'center', fontWeight: 600 }}>
           Hostname
         </dt>
         <dd style={{ margin: 0, fontWeight: 500 }}>{node.profile.hostname}</dd>
 
         {/* OS / Arch */}
-        <dt style={{ fontSize: '0.75em', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-muted)', alignSelf: 'center', fontWeight: 600 }}>
+        <dt style={{ fontSize: '0.75em', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-text-muted)', alignSelf: 'center', fontWeight: 600 }}>
           Platform
         </dt>
         <dd style={{ margin: 0 }}>
@@ -95,18 +95,18 @@ function NodeDetailPanel({ node, t }: { node: NodeView; t: TFunc }) {
         </dd>
 
         {/* RAM */}
-        <dt style={{ fontSize: '0.75em', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-muted)', alignSelf: 'center', fontWeight: 600 }}>
+        <dt style={{ fontSize: '0.75em', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-text-muted)', alignSelf: 'center', fontWeight: 600 }}>
           RAM
         </dt>
         <dd style={{ margin: 0 }}>
           <span style={{ fontWeight: 500 }}>{gb(node.profile.ramAvailableGb)}</span>
-          <span style={{ color: 'var(--text-muted)', fontSize: '0.875em' }}>
+          <span style={{ color: 'var(--color-text-muted)', fontSize: '0.875em' }}>
             {' '}available / {gb(node.profile.ramTotalGb)} total
           </span>
         </dd>
 
         {/* Link quality */}
-        <dt style={{ fontSize: '0.75em', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-muted)', alignSelf: 'center', fontWeight: 600 }}>
+        <dt style={{ fontSize: '0.75em', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-text-muted)', alignSelf: 'center', fontWeight: 600 }}>
           {t('fleet.col.link')}
         </dt>
         <dd style={{ margin: 0 }}>
@@ -116,10 +116,10 @@ function NodeDetailPanel({ node, t }: { node: NodeView; t: TFunc }) {
         {/* Last seen */}
         {node.profile.lastSeen && (
           <>
-            <dt style={{ fontSize: '0.75em', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-muted)', alignSelf: 'center', fontWeight: 600 }}>
+            <dt style={{ fontSize: '0.75em', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-text-muted)', alignSelf: 'center', fontWeight: 600 }}>
               Last seen
             </dt>
-            <dd style={{ margin: 0, fontSize: '0.875em', color: 'var(--text-muted)' }}>
+            <dd style={{ margin: 0, fontSize: '0.875em', color: 'var(--color-text-muted)' }}>
               <time dateTime={node.profile.lastSeen}>
                 {new Date(node.profile.lastSeen).toLocaleString()}
               </time>
@@ -130,7 +130,7 @@ function NodeDetailPanel({ node, t }: { node: NodeView; t: TFunc }) {
         {/* Inference engines */}
         {engines.length > 0 && (
           <>
-            <dt style={{ fontSize: '0.75em', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-muted)', alignSelf: 'flex-start', fontWeight: 600, paddingTop: '2px' }}>
+            <dt style={{ fontSize: '0.75em', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-text-muted)', alignSelf: 'flex-start', fontWeight: 600, paddingTop: '2px' }}>
               Engines
             </dt>
             <dd style={{ margin: 0, display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
@@ -141,15 +141,15 @@ function NodeDetailPanel({ node, t }: { node: NodeView; t: TFunc }) {
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '4px',
-                    background: 'var(--surface)',
-                    border: '1px solid var(--border)',
+                    background: 'var(--color-surface)',
+                    border: '1px solid var(--color-border)',
                     borderRadius: 'var(--radius-sm)',
                     padding: '2px 8px',
                     fontSize: '0.8em',
                   }}
                 >
                   <code style={{ fontFamily: 'var(--font-mono)' }}>{engine}</code>
-                  <span style={{ color: 'var(--text-muted)' }}>{version}</span>
+                  <span style={{ color: 'var(--color-text-muted)' }}>{version}</span>
                 </span>
               ))}
             </dd>
@@ -159,7 +159,7 @@ function NodeDetailPanel({ node, t }: { node: NodeView; t: TFunc }) {
         {/* Advertised agent addr */}
         {node.profile.advertisedAgentAddr && (
           <>
-            <dt style={{ fontSize: '0.75em', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-muted)', alignSelf: 'center', fontWeight: 600 }}>
+            <dt style={{ fontSize: '0.75em', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-text-muted)', alignSelf: 'center', fontWeight: 600 }}>
               Agent addr
             </dt>
             <dd style={{ margin: 0 }}>
@@ -173,7 +173,7 @@ function NodeDetailPanel({ node, t }: { node: NodeView; t: TFunc }) {
         {/* Advertised inference addr */}
         {node.profile.advertisedInferenceAddr && (
           <>
-            <dt style={{ fontSize: '0.75em', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-muted)', alignSelf: 'center', fontWeight: 600 }}>
+            <dt style={{ fontSize: '0.75em', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-text-muted)', alignSelf: 'center', fontWeight: 600 }}>
               Inference addr
             </dt>
             <dd style={{ margin: 0 }}>
@@ -190,7 +190,7 @@ function NodeDetailPanel({ node, t }: { node: NodeView; t: TFunc }) {
 
 // ---------------------------------------------------------------------------
 // Overflow action menu — ⋮ button that expands Drain / Restart / Remove.
-// Danger actions (Drain, Remove) use var(--danger-fg). A visual separator sits
+// Danger actions (Drain, Remove) use var(--color-danger). A visual separator sits
 // between the neutral Restart and the destructive Remove to create a natural
 // pause before the irreversible actions.
 // ---------------------------------------------------------------------------
@@ -221,13 +221,13 @@ function NodeActionMenu({
     border: 'none',
     cursor: 'pointer',
     fontSize: '0.875em',
-    color: 'var(--text)',
+    color: 'var(--color-text)',
     fontFamily: 'inherit',
   };
 
   const dangerItemStyle: React.CSSProperties = {
     ...menuItemStyle,
-    color: 'var(--danger-fg)',
+    color: 'var(--color-danger)',
   };
 
   return (
@@ -260,10 +260,10 @@ function NodeActionMenu({
               top: '100%',
               marginTop: '4px',
               zIndex: 11,
-              background: 'var(--surface)',
-              border: '1px solid var(--border)',
-              borderRadius: 'var(--radius)',
-              boxShadow: 'var(--shadow)',
+              background: 'var(--color-surface)',
+              border: '1px solid var(--color-border)',
+              borderRadius: 'var(--radius-md)',
+              boxShadow: 'var(--shadow-card)',
               padding: '4px 0',
               minWidth: '148px',
               listStyle: 'none',
@@ -275,7 +275,7 @@ function NodeActionMenu({
                 role="menuitem"
                 style={dangerItemStyle}
                 onClick={() => { setOpen(false); onDrain(); }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--danger-bg)'; }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--color-danger-bg)'; }}
                 onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; }}
               >
                 {t('fleet.action.drain')}
@@ -286,20 +286,20 @@ function NodeActionMenu({
                 role="menuitem"
                 style={menuItemStyle}
                 onClick={() => { setOpen(false); onRestart(); }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--surface-2)'; }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--color-surface-2)'; }}
                 onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; }}
               >
                 {t('fleet.action.restart')}
               </button>
             </li>
             {/* Visual separator before the destructive Remove action */}
-            <li role="separator" style={{ height: '1px', background: 'var(--border)', margin: '4px 0' }} />
+            <li role="separator" style={{ height: '1px', background: 'var(--color-border)', margin: '4px 0' }} />
             <li>
               <button
                 role="menuitem"
                 style={dangerItemStyle}
                 onClick={() => { setOpen(false); onRemove(); }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--danger-bg)'; }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--color-danger-bg)'; }}
                 onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; }}
               >
                 {t('fleet.action.remove')}
@@ -353,7 +353,7 @@ function NodeRow({
               width: '1em',
               marginRight: '6px',
               fontSize: '0.7em',
-              color: 'var(--text-muted)',
+              color: 'var(--color-text-muted)',
               transition: 'transform 150ms ease',
               transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
             }}
@@ -520,19 +520,19 @@ export function FleetPage() {
               display: 'flex',
               alignItems: 'center',
               gap: '0.75rem',
-              background: 'var(--info-bg)',
-              border: '1px solid color-mix(in srgb, var(--info-fg) 25%, transparent)',
-              borderRadius: 'var(--radius)',
+              background: 'var(--color-info-bg)',
+              border: '1px solid color-mix(in srgb, var(--color-info) 25%, transparent)',
+              borderRadius: 'var(--radius-md)',
               padding: '12px 16px',
               fontSize: '0.9em',
             }}
           >
-            <span aria-hidden="true" style={{ color: 'var(--info-fg)', fontSize: '1.1em' }}>ℹ</span>
-            <span style={{ color: 'var(--text)' }}>
+            <span aria-hidden="true" style={{ color: 'var(--color-info)', fontSize: '1.1em' }}>ℹ</span>
+            <span style={{ color: 'var(--color-text)' }}>
               {t('fleet.idle.banner')}{' '}
               <Link
                 to="/catalog"
-                style={{ color: 'var(--info-fg)', fontWeight: 600, textDecoration: 'none', borderBottom: '1px solid color-mix(in srgb, var(--info-fg) 40%, transparent)' }}
+                style={{ color: 'var(--color-info)', fontWeight: 600, textDecoration: 'none', borderBottom: '1px solid color-mix(in srgb, var(--color-info) 40%, transparent)' }}
               >
                 {t('fleet.idle.link')}
               </Link>

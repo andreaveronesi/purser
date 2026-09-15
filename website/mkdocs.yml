@@ -145,4 +145,5 @@ nav:
   - Development:
     - Benchmarking the Planner: development/benchmarking.md
     - Testing Architecture: development/testing.md
+    - Frontend Tokens and Layout: development/frontend.md
   - Changelog: changelog.md

@@ -177,7 +177,7 @@ function RoleFormModal({ orgId, role, onClose }: RoleFormModalProps) {
 
           {catLoading && <LoadingBlock />}
           {catError && (
-            <p style={{ margin: 0, color: 'var(--danger-fg)', fontSize: '0.85em' }}>
+            <p style={{ margin: 0, color: 'var(--color-danger)', fontSize: '0.85em' }}>
               {t('error.permissions')}
             </p>
           )}
@@ -196,7 +196,7 @@ function RoleFormModal({ orgId, role, onClose }: RoleFormModalProps) {
               {groups.map(({ scope, perms }) => (
                 <fieldset
                   key={scope}
-                  style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '0.6rem 0.9rem 0.8rem', margin: 0 }}
+                  style={{ border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: '0.6rem 0.9rem 0.8rem', margin: 0 }}
                 >
                   <legend style={{ padding: '0 0.35rem', fontSize: '0.78em', fontWeight: 600, letterSpacing: '0.02em', color: 'var(--text-muted, var(--color-text-muted))' }}>
                     {scopeLabel(t, scope)}
@@ -236,7 +236,7 @@ function RoleFormModal({ orgId, role, onClose }: RoleFormModalProps) {
         </div>
 
         {mutErr && (
-          <p style={{ margin: 0, color: 'var(--danger-fg)', fontSize: '0.875em' }}>
+          <p style={{ margin: 0, color: 'var(--color-danger)', fontSize: '0.875em' }}>
             {mutErr instanceof Error ? mutErr.message : t('error.roles.save')}
           </p>
         )}

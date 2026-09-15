@@ -69,15 +69,15 @@ function EventChip({ name }: { name: string }) {
         fontSize: '0.8em',
         fontWeight: 600,
         lineHeight: 1,
-        border: '1px solid color-mix(in srgb, var(--border) 80%, transparent)',
+        border: '1px solid color-mix(in srgb, var(--color-border) 80%, transparent)',
       }}
     >
       <span
         style={{
           padding: '4px 8px',
-          background: 'color-mix(in srgb, var(--accent) 15%, transparent)',
-          color: 'var(--accent)',
-          borderRight: '1px solid color-mix(in srgb, var(--border) 80%, transparent)',
+          background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)',
+          color: 'var(--color-accent)',
+          borderRight: '1px solid color-mix(in srgb, var(--color-border) 80%, transparent)',
         }}
       >
         {prefix}
@@ -85,8 +85,8 @@ function EventChip({ name }: { name: string }) {
       <span
         style={{
           padding: '4px 8px',
-          background: 'var(--surface-2, var(--bg))',
-          color: 'var(--text)',
+          background: 'var(--surface-2, var(--color-bg))',
+          color: 'var(--color-text)',
         }}
       >
         .{suffix}
@@ -127,7 +127,7 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
         fontWeight: 600,
         textTransform: 'uppercase',
         letterSpacing: '0.06em',
-        color: 'var(--text-muted, var(--muted))',
+        color: 'var(--text-muted, var(--color-text-muted))',
       }}
     >
       {children}
@@ -143,7 +143,7 @@ export function WebhooksPage() {
   const t = useT();
 
   return (
-    <div className="page">
+    <div className="page page--narrow">
       <PageHeader
         title={t('webhooks.title')}
         subtitle={t('webhooks.subtitle')}
@@ -152,9 +152,9 @@ export function WebhooksPage() {
       {/* Placeholder card */}
       <div
         style={{
-          background: 'var(--surface, var(--bg))',
-          border: '1px solid var(--border)',
-          borderRadius: 'var(--radius)',
+          background: 'var(--surface, var(--color-bg))',
+          border: '1px solid var(--color-border)',
+          borderRadius: 'var(--radius-md)',
           overflow: 'hidden',
         }}
       >
@@ -162,7 +162,7 @@ export function WebhooksPage() {
         <div
           style={{
             padding: '2rem 2rem 1.5rem',
-            borderBottom: '1px solid var(--border)',
+            borderBottom: '1px solid var(--color-border)',
             display: 'flex',
             flexDirection: 'column',
             gap: '0.75rem',
@@ -176,7 +176,7 @@ export function WebhooksPage() {
               margin: 0,
               fontSize: '1.25rem',
               fontWeight: 700,
-              color: 'var(--text)',
+              color: 'var(--color-text)',
             }}
           >
             {t('webhooks.placeholder.heading')}
@@ -186,7 +186,7 @@ export function WebhooksPage() {
               margin: 0,
               fontSize: '0.92em',
               lineHeight: 1.6,
-              color: 'var(--text-muted, var(--muted))',
+              color: 'var(--text-muted, var(--color-text-muted))',
               maxWidth: '56rem',
             }}
           >
@@ -206,7 +206,7 @@ export function WebhooksPage() {
           <div
             style={{
               padding: '1.5rem 2rem',
-              borderRight: '1px solid var(--border)',
+              borderRight: '1px solid var(--color-border)',
             }}
           >
             <SectionHeading>{t('webhooks.placeholder.events.title')}</SectionHeading>
@@ -220,7 +220,7 @@ export function WebhooksPage() {
                   <span
                     style={{
                       fontSize: '0.85em',
-                      color: 'var(--text-muted, var(--muted))',
+                      color: 'var(--text-muted, var(--color-text-muted))',
                       lineHeight: 1.5,
                       paddingTop: '2px',
                     }}
@@ -239,7 +239,7 @@ export function WebhooksPage() {
               style={{
                 background: '#0d1117',
                 border: '1px solid #30363d',
-                borderRadius: 'var(--radius)',
+                borderRadius: 'var(--radius-md)',
                 overflow: 'auto',
                 maxHeight: '380px',
               }}
@@ -266,15 +266,15 @@ export function WebhooksPage() {
         <div
           style={{
             padding: '1rem 2rem',
-            borderTop: '1px solid var(--border)',
-            background: 'var(--surface-2, color-mix(in srgb, var(--border) 20%, var(--bg)))',
+            borderTop: '1px solid var(--color-border)',
+            background: 'var(--surface-2, color-mix(in srgb, var(--color-border) 20%, var(--color-bg)))',
             display: 'flex',
             alignItems: 'center',
             gap: '0.5rem',
             flexWrap: 'wrap',
           }}
         >
-          <span style={{ fontSize: '0.875em', color: 'var(--text-muted, var(--muted))' }}>
+          <span style={{ fontSize: '0.875em', color: 'var(--text-muted, var(--color-text-muted))' }}>
             {t('webhooks.placeholder.subscribe')}
           </span>
           <a
@@ -283,7 +283,7 @@ export function WebhooksPage() {
             rel="noreferrer"
             style={{
               fontSize: '0.875em',
-              color: 'var(--accent)',
+              color: 'var(--color-accent)',
               fontWeight: 600,
               textDecoration: 'none',
               whiteSpace: 'nowrap',
