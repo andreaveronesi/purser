@@ -22,18 +22,19 @@ package config
 //	  - team: eng
 //	    monthly_requests: 100000
 type ClusterConfig struct {
-	APIVersion  string         `yaml:"apiVersion"`
-	Kind        string         `yaml:"kind"`
-	Metadata    Metadata       `yaml:"metadata"`
-	Cluster     ClusterSpec    `yaml:"cluster"`
-	Models      []ModelSpec    `yaml:"models"`
-	Deployments []DeploySpec   `yaml:"deployments"`
-	Quotas      []QuotaSpec    `yaml:"quotas"`
-	Gateway     GatewaySpec    `yaml:"gateway"`
-	Orgs        []OrgSpec      `yaml:"orgs,omitempty"`
-	NodePools   []NodePoolSpec `yaml:"node_pools,omitempty"`
-	LDAP        *LDAPConfig    `yaml:"ldap,omitempty"`
-	Quorum      *QuorumConfig  `yaml:"quorum,omitempty"`
+	APIVersion  string           `yaml:"apiVersion"`
+	Kind        string           `yaml:"kind"`
+	Metadata    Metadata         `yaml:"metadata"`
+	Cluster     ClusterSpec      `yaml:"cluster"`
+	Models      []ModelSpec      `yaml:"models"`
+	Deployments []DeploySpec     `yaml:"deployments"`
+	Quotas      []QuotaSpec      `yaml:"quotas"`
+	Gateway     GatewaySpec      `yaml:"gateway"`
+	Orgs        []OrgSpec        `yaml:"orgs,omitempty"`
+	NodePools   []NodePoolSpec   `yaml:"node_pools,omitempty"`
+	LDAP        *LDAPConfig      `yaml:"ldap,omitempty"`
+	LocalAuth   *LocalAuthConfig `yaml:"localAuth,omitempty"`
+	Quorum      *QuorumConfig    `yaml:"quorum,omitempty"`
 	// SLO configures per-model TTFT/TBT SLO contracts.
 	SLO *SLOConfig `yaml:"slo,omitempty"`
 }
@@ -185,6 +186,22 @@ type LDAPConfig struct {
 	// "" (the default) means deny access when no group matches.
 	// Valid values: "admin", "viewer", "inference", or "" (deny).
 	DefaultRole string `yaml:"default_role"`
+}
+
+// LocalAuthConfig is the optional purser.yaml localAuth block for the built-in
+// local admin account (POST /auth/local-login).
+//
+//	localAuth:
+//	  username: admin
+//
+// Only the username is configured here. The master password is read from the
+// PURSER_ADMIN_PASSWORD environment variable ONLY and is NEVER placed in
+// purser.yaml, so the secret is not committed to a GitOps repository. Setting
+// the password (via the env var) is what enables the account and closes the
+// demo fail-open.
+type LocalAuthConfig struct {
+	// Username of the local admin account. Defaults to "admin" when empty.
+	Username string `yaml:"username"`
 }
 
 // SLOConfig holds per-model SLO parameters. "*" key = global default.
