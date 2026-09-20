@@ -377,6 +377,19 @@ type Config struct {
 	// when set LDAPConfig is ignored.
 	LDAPConnector LDAPAuthenticator
 
+	// LocalAuthUsername is the username of the built-in local admin account.
+	// Defaults to "admin" in New() when empty. Read from PURSER_ADMIN_USERNAME
+	// (or the localAuth.username field of purser.yaml) by main.go.
+	LocalAuthUsername string
+	// LocalAuthPassword is the master password for the built-in local admin
+	// account. It is read from the PURSER_ADMIN_PASSWORD environment variable
+	// ONLY — never from purser.yaml — so the master key is not committed to a
+	// GitOps repo. When non-empty it does two things: it enables
+	// POST /auth/local-login, and it CLOSES the fail-open "demo mode" so that
+	// anonymous /api/v1/* requests are rejected with 401 instead of passed
+	// through. Leave empty to disable local admin login (demo mode preserved).
+	LocalAuthPassword string
+
 	// Quorum, when set, enables multi-person approval requirements for deployment
 	// gates (AI Act Art.14 dual-control). Loaded from purser.yaml quorum block at
 	// startup. Nil means single-approver mode (backward compatible default).
@@ -419,6 +432,12 @@ type Server struct {
 	raftNode          RaftNode                 // nil = standalone mode
 
 	ldapConnector LDAPAuthenticator // nil if LDAP not configured
+
+	// localAuthUsername / localAuthPassword back the built-in local admin
+	// account (POST /auth/local-login). When localAuthPassword is non-empty the
+	// account is enabled AND demo fail-open is closed. See Config.LocalAuthPassword.
+	localAuthUsername string
+	localAuthPassword string
 
 	// quorum holds the cluster-wide approval quorum configuration (from
 	// purser.yaml). Nil when no quorum config is set (single-approver mode).
@@ -603,6 +622,18 @@ func New(reg registry.Registry, cfg Config) *Server {
 		s.ldapConnector = ldapauth.New(cfg.LDAPConfig)
 	}
 
+	// Built-in local admin account. The password is env-only (never persisted
+	// in purser.yaml). When set it enables POST /auth/local-login AND closes the
+	// demo fail-open so anonymous /api/v1/* requests are rejected.
+	s.localAuthPassword = cfg.LocalAuthPassword
+	s.localAuthUsername = cfg.LocalAuthUsername
+	if s.localAuthUsername == "" {
+		s.localAuthUsername = "admin"
+	}
+	if s.localAuthPassword != "" {
+		logger.Info("local admin authentication enabled (demo fail-open closed)", "username", s.localAuthUsername)
+	}
+
 	s.routes()
 
 	// Eagerly load stored policies (if any) into the OPA engine so the first
@@ -754,6 +785,11 @@ func (s *Server) validateInternalToken(provided string) bool {
 	}
 	return subtle.ConstantTimeCompare([]byte(provided), []byte(s.internalToken)) == 1
 }
+
+// localAuthEnabled reports whether the built-in local admin account is
+// configured. A non-empty master password both enables POST /auth/local-login
+// and closes the demo fail-open (anonymous /api/v1/* → 401).
+func (s *Server) localAuthEnabled() bool { return s.localAuthPassword != "" }
 
 // startKeyExpiryWatcher emits audit events for API keys that will expire within
 // the next 14 days. It ticks every 6 hours and runs until ctx is cancelled.
