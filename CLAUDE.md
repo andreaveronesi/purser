@@ -16,6 +16,38 @@ dependencies between tasks, and sequence work to maximise parallel throughput.**
 
 ---
 
+## Autonomy & decision threshold
+
+**Before starting any non-trivial work, make a preliminary impact estimate** (files
+touched, kind of change, risks). Then decide whether to proceed **by the _clarity_ of
+the decision — never by its size or duration.**
+
+- **Proceed autonomously whenever there is a single clearly-correct technical path** —
+  even if it touches many files or takes a while. A feature that goes the right way,
+  touches 20 files and takes 30 minutes **is done without asking.** Do **not** invent a
+  faster-but-inferior alternative just to hand over a choice: pick the correct path and
+  proceed (mention it in your summary). "This is bigger than expected" is not a reason
+  to stop — a correct, larger change is still the job.
+
+- **Involve the product owner ONLY in these cases:**
+  1. **Irreversible / system-level actions (the one systematic checkpoint — always
+     confirm first, even when the technical path is obvious):** pushing or merging to
+     `main`, creating tags / triggering a release, non-recoverable deletions, actions
+     against external services, and invasive changes to the machine (installing system
+     packages, moving storage/data dirs, `docker/k3s` prunes or uninstalls). Pushing to
+     a `release/vX.Y` or `epic/*` branch is normal workflow, not a checkpoint.
+  2. **Genuinely ambiguous decisions:** several legitimate paths that change visible
+     behaviour or a contract, with none clearly "the right one". Here a single targeted
+     question (or a brainstorming round) is correct.
+
+- A **correct-vs-shortcut trade-off is not an ambiguous decision** — it is the anti-
+  pattern this section exists to prevent. Never turn it into a question.
+
+This threshold governs **_when to ask_**. It does not replace `superpowers:brainstorming`,
+which governs **_how to design_** an architectural change once you are proceeding.
+
+---
+
 ## Repo layout (quick reference)
 
 | Path | Language | Role |
@@ -155,50 +187,31 @@ recovery commands touch containers directly, so prefer `sudo docker …` when in
 ### Start / stop / status
 
 ```bash
-# START (default profile — mock, no real inference)
-sudo docker compose up -d
-# or: make demo   (same, + prints URLs and the demo API key demo-key-12345)
-
-# STATUS — always check with -a so you SEE crashed/exited containers, not just Up ones
-sudo docker compose ps -a
-
-# STOP (removes containers, KEEPS volumes: postgres data + downloaded models)
-sudo docker compose down --remove-orphans
-# or: make demo-stop   (plain `docker compose down`)
-
-# RESTART one service without touching the rest
-sudo docker compose up -d <service>          # e.g. control-plane, proxy
-sudo docker compose restart <service>        # restart in place
+sudo docker compose up -d            # START (default = mock engine); or `make demo`
+sudo docker compose ps -a            # STATUS — `-a` so you SEE crashed/exited containers
+sudo docker compose down --remove-orphans   # STOP (keeps volumes); or `make demo-stop`
+sudo docker compose up -d <service>  # restart/recreate ONE service (e.g. control-plane, proxy)
 ```
 
-Two profiles (see the header comment in `docker-compose.yml`):
-`up -d` = **default** (mock engine); `--profile full up -d` = **real CPU inference**
-(adds `model-init` one-shot TinyLlama download + `agent`; needs
-`purser-agent:v0.6-llamacpp` built first). A fresh stack has **0 routable models** until
-you deploy one — the gateway route table is in-memory and starts empty
-(`make demo-seed` registers `tinyllama-1b`; then deploy it from the UI/API).
+Two profiles (`docker-compose.yml` header): `up -d` = **default** (mock, no GPU);
+`--profile full up -d` = **real CPU inference** (adds a `model-init` TinyLlama download +
+`agent`; needs `purser-agent:v0.6-llamacpp` built first). A fresh stack has **0 routable
+models** — the gateway route table is in-memory and starts empty; `make demo-seed`
+registers `tinyllama-1b`, then deploy it from the UI/API.
 
 ### Making a change and seeing it in the stack
 
-Compose references **pre-built local image tags** (`purser-ui:v0.6-local`,
-`purser-control-plane:v0.6-local`, `purser-gateway:v0.6-local`) with **no `build:`
-stanza** — `up -d` will NOT rebuild from source. After changing code you must rebuild
-the affected image with the **exact tag compose expects**, then recreate that service:
+Compose pins **pre-built local image tags** (`purser-{ui,control-plane,gateway}:v0.6-local`)
+with **no `build:` stanza — `up -d` will NOT rebuild.** Rebuild the affected image with the
+**exact tag** then recreate the service:
 
 ```bash
-# UI change:
-sudo docker build -f deploy/docker/ui.Dockerfile           -t purser-ui:v0.6-local .
-# Control-plane change:
-sudo docker build -f deploy/docker/control-plane.Dockerfile -t purser-control-plane:v0.6-local .
-# Gateway change:
-sudo docker build -f deploy/docker/gateway.Dockerfile       -t purser-gateway:v0.6-local .
-# then pick up the new image:
-sudo docker compose up -d --force-recreate <service>
+sudo docker build -f deploy/docker/<component>.Dockerfile -t purser-<component>:v0.6-local .
+sudo docker compose up -d --force-recreate <service>   # component ∈ {ui, control-plane, gateway}
 ```
 
-**Exception — the nginx config** (`deploy/docker/demo-nginx.conf`) is a **`:ro` bind
-mount**, not baked into an image. Editing it does NOT need a rebuild, but a single-file
-bind mount **pins the inode**, so an in-place edit may not apply and `nginx -s reload`
+**Exception — the nginx config** (`deploy/docker/demo-nginx.conf`) is a **`:ro` single-file
+bind mount** that **pins the inode**: an in-place edit may not apply and `nginx -s reload`
 won't help — `sudo docker compose restart proxy` will. Run `sudo docker compose config`
 (a one-second syntax check) after any compose edit. See
 `docs/postmortems/demo_stack_fragility.md`.
@@ -294,7 +307,9 @@ These capture the WHY behind non-obvious decisions, not derivable from the code.
   and `enterprise/license/` collide, so `git status` permanently shows a phantom
   ` D enterprise/LICENSE`. **Never `git add -A` / `git add .` / `git commit -a` /
   `git stash -u`** — it stages the deletion of the Enterprise License text.
-  Always stage explicit paths.
+  Always stage explicit paths. (On Linux — case-sensitive FS — the two do not
+  collide, so the phantom deletion does not appear there; the rule still holds
+  as a safety habit and for anyone on macOS/APFS.)
 - `docs/postmortems/macos_toolchain_bootstrap.md` — **fixed**: `make setup` now
   detects macOS/Linux × arm64/amd64 and installs helm + mkdocs too, and `env.sh`
   reports real status. Still live: behind the corporate proxy some Go module zips
