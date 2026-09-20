@@ -19,6 +19,11 @@
 #   PURSER_GATEWAY_BASE_URL  OpenAI-compatible Gateway base. Default /v1.
 #   PURSER_UI_MOCK           1/true/on/yes -> ship the in-memory mock (demos
 #                            only). Default OFF: the UI talks to the real API.
+#   PURSER_UI_LOCAL_AUTH     1/true/on/yes -> the control plane has a built-in
+#                            local admin login enabled (PURSER_ADMIN_PASSWORD set
+#                            on the control-plane). Makes the UI render the
+#                            username/password login form and leave dev-mode.
+#                            Default OFF. See website/docs/auth/local-admin.md.
 #   PURSER_UI_ROOT           Static root to write into. Default the nginx root.
 #   PURSER_OIDC_ISSUER       OIDC provider base URL, e.g.
 #                            https://login.microsoftonline.com/<tenant>/v2.0
@@ -39,6 +44,7 @@ OUT="$ROOT/env.js"
 API_BASE_URL="${PURSER_API_BASE_URL:-/api/v1}"
 GATEWAY_BASE_URL="${PURSER_GATEWAY_BASE_URL:-/v1}"
 MOCK="${PURSER_UI_MOCK:-}"
+LOCAL_AUTH="${PURSER_UI_LOCAL_AUTH:-}"
 OIDC_ISSUER="${PURSER_OIDC_ISSUER:-}"
 OIDC_CLIENT_ID="${PURSER_OIDC_CLIENT_ID:-}"
 OIDC_REDIRECT_URI="${PURSER_OIDC_REDIRECT_URI:-}"
@@ -50,6 +56,13 @@ esc() { printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g'; }
 MOCK_LINE=""
 case "$(printf '%s' "$MOCK" | tr '[:upper:]' '[:lower:]')" in
   1 | true | on | yes) MOCK_LINE='  mock: true,' ;;
+esac
+
+# Local-admin login form: only shown when the control plane has a built-in local
+# admin enabled (PURSER_ADMIN_PASSWORD). Off unless explicitly enabled.
+LOCAL_AUTH_LINE=""
+case "$(printf '%s' "$LOCAL_AUTH" | tr '[:upper:]' '[:lower:]')" in
+  1 | true | on | yes) LOCAL_AUTH_LINE='  localAuth: true,' ;;
 esac
 
 # OIDC block: only emitted when all three vars are non-empty so the UI can
@@ -68,8 +81,9 @@ fi
   echo "  apiBase: \"$(esc "$API_BASE_URL")\","
   echo "  gatewayBase: \"$(esc "$GATEWAY_BASE_URL")\","
   [ -n "$MOCK_LINE" ] && echo "$MOCK_LINE"
+  [ -n "$LOCAL_AUTH_LINE" ] && echo "$LOCAL_AUTH_LINE"
   [ -n "$OIDC_BLOCK" ] && echo "$OIDC_BLOCK"
   echo "};"
 } >"$OUT"
 
-echo "purser-ui: wrote $OUT (apiBase=$API_BASE_URL gatewayBase=$GATEWAY_BASE_URL mock=${MOCK:-0} oidc=${OIDC_ISSUER:-disabled})"
+echo "purser-ui: wrote $OUT (apiBase=$API_BASE_URL gatewayBase=$GATEWAY_BASE_URL mock=${MOCK:-0} localAuth=${LOCAL_AUTH:-0} oidc=${OIDC_ISSUER:-disabled})"

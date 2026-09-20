@@ -121,7 +121,12 @@ gateway:
   resources: {}
 
 ui:
-  port: 80
+  # Port the UI Service exposes AND the container listens on. MUST match the
+  # nginx `listen` directive baked into the image (deploy/docker/nginx.conf →
+  # 8080). The image runs non-root (UID 65532) and cannot bind privileged port
+  # 80, so this is 8080, not 80. (containerPort, the Service targetPort, and the
+  # liveness/readiness probes all derive from this value.)
+  port: 8080
   # Base URL the browser uses for the Control-Plane management REST API
   # (/api/v1). Injected at container start into env.js (window.__PURSER_CONFIG__)
   # as PURSER_API_BASE_URL — Vite bakes build-time env, so this is the knob that
