@@ -12,6 +12,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > around the fleet, and wires end-to-end login + role-based access.
 
 ### Added — Authentication & access control
+- **Built-in local admin login (master key)** — set `PURSER_ADMIN_PASSWORD` on
+  the control-plane to enable a single local `admin` account (username from
+  `PURSER_ADMIN_USERNAME` / `localAuth.username`, default `admin`; password is
+  read from the environment only, never `purser.yaml`). `POST /auth/local-login`
+  verifies credentials in constant time and issues the standard session cookie
+  (`auth_method=local`, `role=admin`). **Configuring it closes the demo/fail-open
+  hole**: anonymous `/api/v1/*` requests then return 401 and the UI shows a login
+  form (runtime flag `localAuth`). Real login without standing up OIDC/LDAP.
+  See `website/docs/auth/local-admin.md`
 - **Login UI** — `/login` page with OIDC SSO button and LDAP form; global
   `AuthContext` (loads `GET /api/v1/platform/users/me` on mount), `ProtectedRoute`
   guard, and a topbar showing the current user + logout
