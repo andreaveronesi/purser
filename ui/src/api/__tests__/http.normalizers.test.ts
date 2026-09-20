@@ -11,7 +11,7 @@
 //   - join-token: { token, cluster_id, expires_at }
 // ---------------------------------------------------------------------------
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createHttpApi } from '../http';
+import { createHttpApi, usableUrl } from '../http';
 
 // The base URL is irrelevant — fetch is fully mocked.
 const BASE = '/api/v1';
@@ -315,6 +315,23 @@ describe('getCapacity — real /cluster/health shape', () => {
     const cap = await api.getCapacity();
     expect(cap.readyNodeCount).toBe(2);
   });
+
+  // E3 fix: RAM/VRAM aggregate fields
+  it('maps ram_total_gb and vram_total_gb from the new fields', async () => {
+    mockFetch({ ...realHealthResponse, ram_total_gb: 30.74, vram_total_gb: 0 });
+    const cap = await api.getCapacity();
+    expect(cap.ramTotalGb).toBeCloseTo(30.74, 2);
+    // VRAM=0 is a real value on CPU-only clusters — must not become null
+    expect(cap.vramTotalGb).toBe(0);
+  });
+
+  it('returns null for ramTotalGb when field absent (pre-v0.7 backend)', async () => {
+    // Backends before v0.7 did not send ram_total_gb → null = "not measured"
+    mockFetch(realHealthResponse); // no ram_total_gb / vram_total_gb
+    const cap = await api.getCapacity();
+    expect(cap.ramTotalGb).toBeNull();
+    expect(cap.vramTotalGb).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -338,5 +355,202 @@ describe('getJoinInfo — real /join-token shape', () => {
     mockFetch(realJoinTokenResponse);
     const info = await api.getJoinInfo();
     expect(info.expiresAt).toBe('2026-09-12T22:24:09Z');
+  });
+
+  // E3 fix: control_plane_url field
+  it('maps control_plane_url → controlPlaneUrl when present', async () => {
+    mockFetch({ ...realJoinTokenResponse, control_plane_url: 'https://cp.example.com:8443' });
+    const info = await api.getJoinInfo();
+    expect(info.controlPlaneUrl).toBe('https://cp.example.com:8443');
+  });
+
+  it('falls back to window.location.origin when control_plane_url is absent', async () => {
+    // Servers without PublicAddr configured send an empty string or omit the field.
+    // The normalizer must fall back to window.location.origin so install commands
+    // are never empty.
+    mockFetch(realJoinTokenResponse); // no control_plane_url field
+    const info = await api.getJoinInfo();
+    // Use the actual jsdom origin — what matters is it's not empty
+    expect(info.controlPlaneUrl).toBe(window.location.origin);
+    expect(info.controlPlaneUrl).not.toBe('');
+  });
+
+  it('falls back to window.location.origin when control_plane_url is empty string', async () => {
+    mockFetch({ ...realJoinTokenResponse, control_plane_url: '' });
+    const info = await api.getJoinInfo();
+    expect(info.controlPlaneUrl).toBe(window.location.origin);
+    expect(info.controlPlaneUrl).not.toBe('');
+  });
+
+  // E7 fix: port-only / empty-host URLs must be treated as unusable.
+  // Before the fix, ":8080" was non-empty so it passed through verbatim,
+  // making every install command use a host-less URL like
+  //   curl -fsSL :8080/install/agent.sh | sh
+  it('falls back to window.location.origin when control_plane_url is ":8080" (port-only, no host)', async () => {
+    mockFetch({ ...realJoinTokenResponse, control_plane_url: ':8080' });
+    const info = await api.getJoinInfo();
+    expect(info.controlPlaneUrl).toBe(window.location.origin);
+    expect(info.controlPlaneUrl).not.toBe(':8080');
+  });
+
+  it('falls back to window.location.origin when control_plane_url is "http://:8080" (empty host)', async () => {
+    mockFetch({ ...realJoinTokenResponse, control_plane_url: 'http://:8080' });
+    const info = await api.getJoinInfo();
+    expect(info.controlPlaneUrl).toBe(window.location.origin);
+    expect(info.controlPlaneUrl).not.toBe('http://:8080');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// usableUrl — unit tests for the exported helper
+// ---------------------------------------------------------------------------
+
+describe('usableUrl', () => {
+  it('returns false for empty string', () => {
+    expect(usableUrl('')).toBe(false);
+  });
+
+  it('returns false for ":8080" (port-only, no host)', () => {
+    expect(usableUrl(':8080')).toBe(false);
+  });
+
+  it('returns false for "http://:8080" (empty host)', () => {
+    expect(usableUrl('http://:8080')).toBe(false);
+  });
+
+  it('returns true for a valid URL with host', () => {
+    expect(usableUrl('https://cp.acme.com')).toBe(true);
+  });
+
+  it('returns true for URL with host and port', () => {
+    expect(usableUrl('https://cp.acme.com:8443')).toBe(true);
+  });
+
+  it('returns true for URL with path', () => {
+    expect(usableUrl('http://localhost:3000')).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getSloComplianceFull — regression: camelizeKeys converts snake_case fields.
+// Before the fix, r.window_hours / r.generated_at / r.models[i].model_id
+// were undefined after camelization, so defaults were always used and page
+// field accesses like model.model_id / model.slo.ttft_ms returned undefined.
+// ---------------------------------------------------------------------------
+
+describe('getSloComplianceFull — SLO normalizer regression', () => {
+  const realSloResponse = {
+    window_hours: 48,
+    generated_at: '2026-09-12T00:00:00Z',
+    models: [
+      {
+        model_id: 'llama3-8b',
+        slo: { ttft_ms: 2000, tbt_ms: 500, target_compliance: 0.95 },
+        actual: {
+          ttft_compliance: 0.987,
+          tbt_compliance: null,
+          request_count: 1420,
+          period_start: '2026-09-07T21:00:00Z',
+        },
+        status: 'met',
+      },
+    ],
+  };
+
+  it('window_hours from backend is preserved (not replaced by the default 24)', async () => {
+    mockFetch(realSloResponse);
+    const r = await api.getSloComplianceFull(24);
+    expect(r.window_hours).toBe(48);
+  });
+
+  it('generated_at from backend is preserved (not replaced by new Date())', async () => {
+    mockFetch(realSloResponse);
+    const r = await api.getSloComplianceFull(24);
+    expect(r.generated_at).toBe('2026-09-12T00:00:00Z');
+  });
+
+  it('models array is populated', async () => {
+    mockFetch(realSloResponse);
+    const r = await api.getSloComplianceFull(24);
+    expect(r.models).toHaveLength(1);
+  });
+
+  it('model_id is preserved (not undefined after camelizeKeys)', async () => {
+    mockFetch(realSloResponse);
+    const r = await api.getSloComplianceFull(24);
+    expect(r.models[0].model_id).toBe('llama3-8b');
+  });
+
+  it('slo.ttft_ms is a number (not undefined after camelizeKeys)', async () => {
+    mockFetch(realSloResponse);
+    const r = await api.getSloComplianceFull(24);
+    expect(r.models[0].slo.ttft_ms).toBe(2000);
+  });
+
+  it('slo.tbt_ms is a number', async () => {
+    mockFetch(realSloResponse);
+    const r = await api.getSloComplianceFull(24);
+    expect(r.models[0].slo.tbt_ms).toBe(500);
+  });
+
+  it('slo.target_compliance is a number', async () => {
+    mockFetch(realSloResponse);
+    const r = await api.getSloComplianceFull(24);
+    expect(r.models[0].slo.target_compliance).toBeCloseTo(0.95, 2);
+  });
+
+  it('actual.ttft_compliance is the backend number (not undefined)', async () => {
+    mockFetch(realSloResponse);
+    const r = await api.getSloComplianceFull(24);
+    expect(r.models[0].actual.ttft_compliance).toBeCloseTo(0.987, 3);
+  });
+
+  it('actual.request_count is a number', async () => {
+    mockFetch(realSloResponse);
+    const r = await api.getSloComplianceFull(24);
+    expect(r.models[0].actual.request_count).toBe(1420);
+  });
+
+  it('status is preserved', async () => {
+    mockFetch(realSloResponse);
+    const r = await api.getSloComplianceFull(24);
+    expect(r.models[0].status).toBe('met');
+  });
+
+  it('null ttft_compliance survives as null (not NaN, not a throw)', async () => {
+    mockFetch({
+      window_hours: 24,
+      generated_at: '2026-09-12T00:00:00Z',
+      models: [
+        {
+          model_id: 'llama3-8b',
+          slo: { ttft_ms: 2000, tbt_ms: 500, target_compliance: 0.95 },
+          actual: {
+            ttft_compliance: null,
+            tbt_compliance: null,
+            request_count: 5,
+            period_start: '2026-09-07T21:00:00Z',
+          },
+          status: 'insufficient_data',
+        },
+      ],
+    });
+    const r = await api.getSloComplianceFull(24);
+    expect(r.models[0].actual.ttft_compliance).toBeNull();
+    expect(r.models[0].actual.tbt_compliance).toBeNull();
+    expect(r.models[0].status).toBe('insufficient_data');
+  });
+
+  it('empty models array is safe (no crash)', async () => {
+    mockFetch({ window_hours: 24, generated_at: '2026-09-12T00:00:00Z', models: [] });
+    const r = await api.getSloComplianceFull(24);
+    expect(r.models).toEqual([]);
+    expect(r.window_hours).toBe(24);
+  });
+
+  it('missing models key returns empty array', async () => {
+    mockFetch({ window_hours: 24, generated_at: '2026-09-12T00:00:00Z' });
+    const r = await api.getSloComplianceFull(24);
+    expect(r.models).toEqual([]);
   });
 });

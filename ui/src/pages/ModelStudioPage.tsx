@@ -74,9 +74,9 @@ function Stepper({ steps }: { steps: Step[] }) {
           fontSize: '0.875rem',
           fontWeight: 600,
           border: '2px solid',
-          borderColor: isDone ? 'var(--success-fg)' : isActive ? 'var(--accent)' : 'var(--border)',
-          background:  isDone ? 'var(--success-fg)' : isActive ? 'var(--accent)' : 'var(--surface)',
-          color:       isDone || isActive ? 'var(--accent-contrast)' : 'var(--text-muted)',
+          borderColor: isDone ? 'var(--color-success)' : isActive ? 'var(--color-accent)' : 'var(--color-border)',
+          background:  isDone ? 'var(--color-success)' : isActive ? 'var(--color-accent)' : 'var(--color-surface)',
+          color:       isDone || isActive ? 'var(--color-accent-contrast)' : 'var(--color-text-muted)',
           position: 'relative',
           zIndex: 1,
           flexShrink: 0,
@@ -85,12 +85,12 @@ function Stepper({ steps }: { steps: Step[] }) {
         const labelStyle: React.CSSProperties = {
           marginTop: '0.4rem',
           fontSize: '0.75rem',
-          color: step.state === 'pending' ? 'var(--text-muted)' : 'var(--text)',
+          color: step.state === 'pending' ? 'var(--color-text-muted)' : 'var(--color-text)',
           fontWeight: step.state === 'pending' ? 400 : 500,
           textAlign: 'center',
           whiteSpace: 'nowrap',
         };
-        const lineColor = isDone ? 'var(--success-fg)' : 'var(--border)';
+        const lineColor = isDone ? 'var(--color-success)' : 'var(--color-border)';
         return (
           <div
             key={step.label}

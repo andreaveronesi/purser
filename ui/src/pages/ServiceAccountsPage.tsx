@@ -161,12 +161,12 @@ function CreatedSaModal({ sa, onClose }: { sa: ServiceAccountWithSecret; onClose
       </div>
 
       <div>
-        <p style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: '6px' }}>
+        <p style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-muted)', marginBottom: '6px' }}>
           Client ID
         </p>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <code
-            style={{ fontFamily: 'var(--font-mono)', fontSize: '13px', flex: 1, background: 'var(--surface-2)', padding: '6px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}
+            style={{ fontFamily: 'var(--font-mono)', fontSize: '13px', flex: 1, background: 'var(--color-surface-2)', padding: '6px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}
             data-testid="sa-client-id"
           >
             {sa.clientId}
@@ -176,12 +176,12 @@ function CreatedSaModal({ sa, onClose }: { sa: ServiceAccountWithSecret; onClose
       </div>
 
       <div>
-        <p style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: '6px' }}>
+        <p style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-muted)', marginBottom: '6px' }}>
           Client secret
         </p>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <code
-            style={{ fontFamily: 'var(--font-mono)', fontSize: '13px', flex: 1, wordBreak: 'break-all', background: 'var(--surface-2)', padding: '6px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}
+            style={{ fontFamily: 'var(--font-mono)', fontSize: '13px', flex: 1, wordBreak: 'break-all', background: 'var(--color-surface-2)', padding: '6px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}
             data-testid="sa-client-secret"
           >
             {sa.clientSecret}
@@ -190,7 +190,7 @@ function CreatedSaModal({ sa, onClose }: { sa: ServiceAccountWithSecret; onClose
         </div>
       </div>
 
-      <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+      <p style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
         Use these credentials with the OAuth2 <code style={{ fontFamily: 'var(--font-mono)' }}>client_credentials</code> grant
         at <code style={{ fontFamily: 'var(--font-mono)' }}>POST /auth/token</code>.
       </p>
@@ -248,14 +248,14 @@ function ServiceAccountRow({ sa }: { sa: ServiceAccount }) {
         <th scope="row">
           <span style={{ fontWeight: 600 }}>{sa.name}</span>
           {sa.description && (
-            <span style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', fontWeight: 400 }}>
+            <span style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-muted)', fontWeight: 400 }}>
               {sa.description}
             </span>
           )}
         </th>
         <td>
           <code
-            style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', background: 'var(--surface-2)', padding: '2px 7px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}
+            style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', background: 'var(--color-surface-2)', padding: '2px 7px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}
             data-testid="sa-client-id-cell"
           >
             {sa.clientId}
@@ -263,7 +263,7 @@ function ServiceAccountRow({ sa }: { sa: ServiceAccount }) {
         </td>
         <td>
           <span
-            style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', background: 'var(--surface-2)', padding: '2px 7px', borderRadius: 'var(--radius-sm)' }}
+            style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', background: 'var(--color-surface-2)', padding: '2px 7px', borderRadius: 'var(--radius-sm)' }}
           >
             {sa.tenant}
           </span>

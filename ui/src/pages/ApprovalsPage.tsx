@@ -176,7 +176,7 @@ function QuorumProgress({ received, required }: QuorumProgressProps) {
       >
         <div style={{
           height: '100%', width: `${pct}%`,
-          background: pct >= 100 ? 'var(--color-success)' : 'var(--color-primary)',
+          background: pct >= 100 ? 'var(--color-success)' : 'var(--color-accent)',
           transition: 'width 0.2s ease',
         }} />
       </div>

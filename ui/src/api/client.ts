@@ -20,6 +20,7 @@ import type {
   AccessLogResponse,
   ApiKey,
   ApiKeyWithSecret,
+  CurrentUser,
   AuditLog,
   BillingForecastResponse,
   BillingReport,
@@ -27,14 +28,27 @@ import type {
   CatalogEntry,
   ChainVerifyResponse,
   ClusterCapacity,
+  CustomRole,
+  ClusterStatus,
+  ConfigApplyResult,
+  ConfigDiff,
   DataPlane,
+  DataPlaneNode,
   DataPlaneWithToken,
+  ModelAdoptionResponse,
+  OrgBillingReport,
+  TeamBillingReport,
+  UpdateDataPlaneInput,
+  UpdateNodePoolInput,
   DeployOverrides,
   Deployment,
   DeploymentApproval,
   DeploymentPlan,
   EffectivePermissions,
   EnterpriseStatus,
+  GdprErasureInput,
+  GdprErasureLogEntry,
+  GdprErasureResult,
   ImportSource,
   InferenceAuditParams,
   InferenceAuditResponse,
@@ -47,13 +61,14 @@ import type {
   NodePool,
   NodeView,
   Organization,
+  PermissionsResponse,
   PlatformUser,
   PlanPreviewResult,
   PoliciesResponse,
   Policy,
   PoolTeamQuota,
+  RolesResponse,
   ReconcilerStatus,
-  SloComplianceResponse,
 
   ServiceAccount,
   ServiceAccountWithSecret,
@@ -89,6 +104,20 @@ export interface CreateServiceAccountInput {
   teamId: string;
   description?: string;
   role: string;
+}
+
+/** Body for POST /api/v1/platform/orgs/{orgId}/roles. */
+export interface CreateRoleInput {
+  name: string;
+  description?: string;
+  permissions: string[];
+}
+
+/** Body for PUT /api/v1/platform/orgs/{orgId}/roles/{id}. */
+export interface UpdateRoleInput {
+  name?: string;
+  description?: string;
+  permissions: string[];
 }
 
 export interface PurserApi {
@@ -175,8 +204,10 @@ export interface PurserApi {
   /**
    * GET /api/v1/billing/report — 402 without the "billing" feature.
    * Returns chargeback report grouped by tenant+model for the given window.
+   * When `slaThresholdMs` is provided the report also carries per-tenant SLA
+   * compliance stats (`sla_stats`) computed against that latency threshold.
    */
-  getBillingReport(start: string, end: string, tenantId?: string): Promise<BillingReport>;
+  getBillingReport(start: string, end: string, tenantId?: string, slaThresholdMs?: number): Promise<BillingReport>;
   /**
    * Returns the URL for CSV download (format=csv). Callers create a link and
    * navigate to it directly — no fetch needed.
@@ -194,6 +225,15 @@ export interface PurserApi {
   getBillingPdfUrl(start: string, end: string, tenantId?: string): string;
   /** GET /api/v1/billing/summary — quick stats, not enterprise-gated. */
   getBillingSummary(tenantId?: string): Promise<BillingSummary>;
+  /**
+   * GET /api/v1/billing/models/adoption — per-model request/token time-series.
+   * 402 without the "billing" feature. `window` buckets by day or ISO week.
+   */
+  getModelAdoption(window?: 'daily' | 'weekly', days?: number): Promise<ModelAdoptionResponse>;
+  /** GET /api/v1/platform/orgs/{orgId}/billing — 402 without "billing". */
+  getOrgBilling(orgId: string, start: string, end: string): Promise<OrgBillingReport>;
+  /** GET /api/v1/platform/teams/{teamId}/billing — 402 without "billing". */
+  getTeamBilling(teamId: string, start: string, end: string): Promise<TeamBillingReport>;
 
   // --- v0.4 platform model: organizations ---
   listOrganizations(): Promise<{ organizations: Organization[] }>;
@@ -216,24 +256,47 @@ export interface PurserApi {
   listNodePools(): Promise<{ pools: NodePool[] }>;
   createNodePool(data: Partial<NodePool>): Promise<NodePool>;
   getNodePool(id: string): Promise<NodePool>;
-  listPoolNodes(poolId: string): Promise<{ node_ids: string[] }>;
+  /** PUT /api/v1/platform/pools/{id} — update name/description/policy; returns the updated pool. */
+  updateNodePool(id: string, input: UpdateNodePoolInput): Promise<NodePool>;
+  /** DELETE /api/v1/platform/pools/{id} — delete a pool. 409 if it still has assigned nodes. */
+  deleteNodePool(id: string): Promise<void>;
+  listPoolNodes(poolId: string): Promise<{ nodeIds: string[] }>;
   assignNodeToPool(poolId: string, nodeId: string): Promise<void>;
   removeNodeFromPool(poolId: string, nodeId: string): Promise<void>;
   listPoolQuotas(poolId: string): Promise<{ quotas: PoolTeamQuota[] }>;
   upsertPoolQuota(poolId: string, teamId: string, quota: Partial<PoolTeamQuota>): Promise<PoolTeamQuota>;
 
   // --- v0.4 platform model: current user ---
-  getMe(): Promise<{ actor: string; orgs: Organization[]; teams: Team[] }>;
+  getMe(): Promise<CurrentUser>;
+  /** POST /auth/ldap-login — authenticate with LDAP credentials. On success the
+   *  server sets a session cookie and returns 200. */
+  ldapLogin(username: string, password: string): Promise<void>;
+  /** POST /auth/local-login — authenticate with the control plane's built-in
+   *  local admin account. On success the server sets a session cookie and 302s
+   *  (2xx/3xx = success); on failure it returns JSON `{message}`. Enabled only
+   *  when `config.localAuth` is true. */
+  localLogin(username: string, password: string): Promise<void>;
   getMyTeamPermissions(teamId: string): Promise<EffectivePermissions>;
+
+  // --- v0.4 RBAC: custom roles (org-scoped) + permission catalog ---
+  /** GET /api/v1/platform/orgs/{orgId}/roles — built-in + custom roles for an org. */
+  listRoles(orgId: string): Promise<RolesResponse>;
+  /** POST /api/v1/platform/orgs/{orgId}/roles — create a custom role (org_admin). 409 on name conflict. */
+  createRole(orgId: string, data: CreateRoleInput): Promise<CustomRole>;
+  /** GET /api/v1/platform/orgs/{orgId}/roles/{id} — a single role. */
+  getRole(orgId: string, id: string): Promise<CustomRole>;
+  /** PUT /api/v1/platform/orgs/{orgId}/roles/{id} — replace a custom role. 409 for system roles. */
+  updateRole(orgId: string, id: string, data: UpdateRoleInput): Promise<CustomRole>;
+  /** DELETE /api/v1/platform/orgs/{orgId}/roles/{id} — 204; 409 if system or in-use. */
+  deleteRole(orgId: string, id: string): Promise<void>;
+  /** GET /api/v1/platform/permissions — the fine-grained permission catalog (not gated). */
+  listPermissions(): Promise<PermissionsResponse>;
 
   // --- what-if planner ---
   /** POST /api/v1/planner/what-if — simulate hardware ROI without committing a deployment. */
   whatIfPlan(request: WhatIfRequest): Promise<WhatIfResult>;
 
   // --- SLO compliance ---
-  /** GET /api/v1/slo/compliance — per-model TTFT SLO compliance for a rolling window. */
-  getSloCompliance(windowHours?: number): Promise<SloComplianceResponse>;
-
   /** GET /api/v1/slo/compliance — full nested compliance response (v0.6). */
   getSloComplianceFull(windowHours?: number): Promise<SloApiResponse>;
 
@@ -248,6 +311,16 @@ export interface PurserApi {
   createDataPlane(input: CreateDataPlaneInput): Promise<DataPlaneWithToken>;
   /** POST /api/v1/platform/dataplanes/{id}/config/refresh — trigger immediate config rebuild. */
   refreshDataPlaneConfig(id: string): Promise<void>;
+  /** PUT /api/v1/platform/dataplanes/{id} — update mutable DP fields; returns the updated DP. */
+  updateDataPlane(id: string, input: UpdateDataPlaneInput): Promise<DataPlane>;
+  /** DELETE /api/v1/platform/dataplanes/{id} — remove a Data Plane. 204 on success. */
+  deleteDataPlane(id: string): Promise<void>;
+  /** GET /api/v1/platform/dataplanes/{id}/nodes — nodes currently assigned to this DP. */
+  listDataPlaneNodes(id: string): Promise<DataPlaneNode[]>;
+  /** POST /api/v1/platform/dataplanes/{id}/nodes/{nodeId} — assign a fleet node to this DP. */
+  assignNodeToDataPlane(id: string, nodeId: string): Promise<void>;
+  /** DELETE /api/v1/platform/dataplanes/{id}/nodes/{nodeId} — unassign a node from this DP. */
+  unassignNodeFromDataPlane(id: string, nodeId: string): Promise<void>;
 
   // --- v0.5 service accounts ---
   /** GET /api/v1/service-accounts — list all machine identities. */
@@ -260,6 +333,39 @@ export interface PurserApi {
   // --- v0.5 platform users ---
   /** GET /api/v1/platform/users — list all platform users (admin only). */
   listPlatformUsers(): Promise<PlatformUser[]>;
+
+  // --- compliance (AI Act + GDPR; all enterprise-gated, 402 license_required) ---
+  /**
+   * GET /api/v1/compliance/ai-act/technical-doc — machine-readable AI Act
+   * Art.11 / Annex-IV technical documentation. Returns the RAW response text
+   * (uncamelized) so the downloaded file matches what the server emitted.
+   * 402 without the "ai_act_compliance" or "inference_audit" feature.
+   */
+  getAiActTechnicalDoc(): Promise<string>;
+  /**
+   * GET /api/v1/compliance/gdpr/record-of-processing — GDPR Art.30 record of
+   * processing activities, as RAW response text. 402 without "inference_audit".
+   */
+  getGdprRecordOfProcessing(): Promise<string>;
+  /**
+   * POST /api/v1/gdpr/erasure — pseudonymise inference-audit records for a
+   * subject. Admin-only + "gdpr" feature (402/403 otherwise).
+   */
+  eraseSubject(input: GdprErasureInput): Promise<GdprErasureResult>;
+  /** GET /api/v1/gdpr/erasure-log — past erasure operations (backend stub returns []). */
+  getGdprErasureLog(): Promise<GdprErasureLogEntry[]>;
+
+  // --- HA / Raft cluster status ---
+  /** GET /api/v1/cluster/status — Raft topology (leader/state/peers). UNauthenticated. */
+  getClusterStatus(): Promise<ClusterStatus>;
+
+  // --- config-as-code (purser.yaml desired state) ---
+  /** GET /api/v1/config/export — current cluster config as a raw YAML document. */
+  exportConfig(): Promise<string>;
+  /** POST /api/v1/config/diff — dry-run a submitted purser.yaml; returns the diff. Safe. */
+  diffConfig(yaml: string): Promise<ConfigDiff>;
+  /** POST /api/v1/config/apply — apply a submitted purser.yaml. MUTATING, cluster-wide. */
+  applyConfig(yaml: string): Promise<ConfigApplyResult>;
 
   // --- policy-as-code (enterprise: policy_engine) ---
   /** GET /api/v1/policies — 402 without the policy_engine feature. */

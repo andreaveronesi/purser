@@ -5,7 +5,7 @@ import { useT } from '../i18n';
 export function NotFoundPage() {
   const t = useT();
   return (
-    <div className="page">
+    <div className="page page--narrow">
       <PageHeader title="404" />
       <EmptyState
         message="This page does not exist."

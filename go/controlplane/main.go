@@ -10,8 +10,10 @@
 //
 // Subcommands:
 //
-//	control-plane backup  --db <src>  --output <dst>
-//	control-plane restore --input <src> --db <dst> --confirm
+//	control-plane backup       --db <src>  --output <dst>
+//	control-plane restore      --input <src> --db <dst> --confirm
+//	control-plane pki rotate     --pki-dir <dir> [--db <path>] --confirm
+//	control-plane pki revoke-all --pki-dir <dir> [--db <path>] --confirm
 package main
 
 import (
@@ -208,6 +210,12 @@ func main() {
 				os.Exit(1)
 			}
 			return
+		case "pki":
+			if err := runPKICmd(logger, os.Args[2:]); err != nil {
+				logger.Error("pki command failed", "err", err)
+				os.Exit(1)
+			}
+			return
 		}
 	}
 
@@ -266,6 +274,149 @@ func runRestoreCmd(logger *slog.Logger, args []string) error {
 		return err
 	}
 	logger.Info("restore complete", "dst", *dbPath)
+	return nil
+}
+
+// runPKICmd implements the `pki` subcommand group.
+//
+//	control-plane pki rotate     --pki-dir <dir> [--db <path>] --confirm
+//	control-plane pki revoke-all --pki-dir <dir> [--db <path>] --confirm
+//
+// These are destructive, rare, operator-only maintenance actions that
+// deliberately live OFF the network rather than behind an HTTP route:
+//
+//   - Rotation replaces the cluster's trust root; revoke-all invalidates every
+//     live agent/gateway certificate. Exposing either over the management API
+//     would put a cluster-wide outage one stray request away. As a CLI they
+//     require shell + filesystem access to the control-plane data directory,
+//     which is already the trust boundary that protects `ca.key`.
+//   - The RBAC vocabulary (permissions.go) has no PKI-scoped permission, and
+//     inventing one is out of scope for this change; gating an HTTP route on an
+//     unrelated permission would be worse than not exposing it.
+//   - It mirrors the existing `backup`/`restore` CLI pattern for irreversible
+//     operations, including the mandatory `--confirm` acknowledgement.
+func runPKICmd(logger *slog.Logger, args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("pki requires a subcommand: rotate | revoke-all")
+	}
+	switch args[0] {
+	case "rotate":
+		return runPKIRotateCmd(logger, args[1:])
+	case "revoke-all":
+		return runPKIRevokeAllCmd(logger, args[1:])
+	default:
+		return fmt.Errorf("unknown pki subcommand %q (want rotate | revoke-all)", args[0])
+	}
+}
+
+// openRegistryAndCA opens the registry (honouring the PURSER_DB_* env vars, with
+// an optional SQLite path override) and loads the on-disk CA from pkiDir. The
+// caller owns the returned registry and must Close it.
+func openRegistryAndCA(ctx context.Context, dbOverride, pkiDir string) (registry.Registry, *pki.Authority, error) {
+	dbCfg := registry.DBConfigFromEnv()
+	if dbOverride != "" {
+		// An explicit --db always names a SQLite file.
+		dbCfg.Driver = "sqlite"
+		dbCfg.DSN = dbOverride
+	}
+	reg, err := registry.OpenFromConfig(dbCfg)
+	if err != nil {
+		return nil, nil, fmt.Errorf("open registry: %w", err)
+	}
+	migCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	if err := reg.Migrate(migCtx); err != nil {
+		reg.Close()
+		return nil, nil, fmt.Errorf("migrate registry: %w", err)
+	}
+	ca, err := pki.New(ctx, reg, pki.Options{Dir: pkiDir})
+	if err != nil {
+		reg.Close()
+		return nil, nil, fmt.Errorf("init pki: %w", err)
+	}
+	return reg, ca, nil
+}
+
+// runPKIRotateCmd implements `pki rotate`.
+//
+// It re-issues the trust root: the previous CA is marked rotated in the
+// registry, a fresh CA keypair is generated and written to --pki-dir. Because
+// this runs as a separate short-lived process, the in-process 72h dual-trust
+// grace window is NOT established — after rotation the control plane must be
+// restarted to adopt the new CA and every agent must re-enroll. This is
+// expected for a root rotation and is documented in
+// website/docs/operations/pki-operations.md.
+func runPKIRotateCmd(logger *slog.Logger, args []string) error {
+	fs := flag.NewFlagSet("pki rotate", flag.ContinueOnError)
+	dbPath := fs.String("db", envOr("PURSER_DB", "purser-registry.db"),
+		"SQLite registry path (env PURSER_DB; ignored when PURSER_DB_DRIVER=postgres)")
+	pkiDir := fs.String("pki-dir", envOr("PURSER_PKI_DIR", "pki-state"),
+		"directory holding the CA key/cert to rotate (env PURSER_PKI_DIR)")
+	confirm := fs.Bool("confirm", false,
+		"required: acknowledge that the active CA is replaced and every agent must re-enroll")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if !*confirm {
+		return fmt.Errorf("--confirm is required: rotation replaces the active CA in %s and forces every agent to re-enroll; pass --confirm to proceed", *pkiDir)
+	}
+
+	ctx := context.Background()
+	reg, ca, err := openRegistryAndCA(ctx, *dbPath, *pkiDir)
+	if err != nil {
+		return err
+	}
+	defer reg.Close()
+
+	oldSerial := "none"
+	if before := ca.CACert(); before != nil {
+		oldSerial = before.SerialNumber.String()
+	}
+	newCert, err := ca.Rotate(ctx)
+	if err != nil {
+		return fmt.Errorf("rotate CA: %w", err)
+	}
+	logger.Info("CA rotated",
+		"old_serial", oldSerial,
+		"new_serial", newCert.SerialNumber.String(),
+		"pki_dir", *pkiDir)
+	logger.Warn("restart the control plane to adopt the new CA, then re-enroll agents",
+		"note", "the in-process 72h dual-trust grace period does not survive a CLI rotation")
+	return nil
+}
+
+// runPKIRevokeAllCmd implements `pki revoke-all`.
+//
+// It marks every issued leaf certificate revoked in the registry. Revocation is
+// checked independently of the trust bundle in VerifyClient, so a running
+// control plane rejects the revoked certs immediately — no restart required.
+func runPKIRevokeAllCmd(logger *slog.Logger, args []string) error {
+	fs := flag.NewFlagSet("pki revoke-all", flag.ContinueOnError)
+	dbPath := fs.String("db", envOr("PURSER_DB", "purser-registry.db"),
+		"SQLite registry path (env PURSER_DB; ignored when PURSER_DB_DRIVER=postgres)")
+	pkiDir := fs.String("pki-dir", envOr("PURSER_PKI_DIR", "pki-state"),
+		"CA key/cert directory (env PURSER_PKI_DIR)")
+	confirm := fs.Bool("confirm", false,
+		"required: acknowledge that every issued agent/gateway certificate is revoked immediately")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if !*confirm {
+		return fmt.Errorf("--confirm is required: this revokes every issued agent/gateway certificate immediately; pass --confirm to proceed")
+	}
+
+	ctx := context.Background()
+	reg, ca, err := openRegistryAndCA(ctx, *dbPath, *pkiDir)
+	if err != nil {
+		return err
+	}
+	defer reg.Close()
+
+	n, err := ca.RevokeAll(ctx)
+	if err != nil {
+		return fmt.Errorf("revoke-all: %w", err)
+	}
+	logger.Info("revoked all issued leaf certificates", "count", n)
 	return nil
 }
 
@@ -511,6 +662,20 @@ func run(logger *slog.Logger) error {
 		}
 	}
 
+	// Built-in local admin account (optional — enabled when PURSER_ADMIN_PASSWORD
+	// is set). The master password is env-only and never read from purser.yaml.
+	// The username comes from PURSER_ADMIN_USERNAME, else the localAuth.username
+	// field of purser.yaml (when a config path is set), else defaults to "admin"
+	// in server.New. When the password is set, server.New closes the demo
+	// fail-open (anonymous /api/v1/* → 401).
+	localAdminPassword := os.Getenv("PURSER_ADMIN_PASSWORD")
+	localAdminUsername := os.Getenv("PURSER_ADMIN_USERNAME")
+	if localAdminUsername == "" && cfg.configPath != "" {
+		if cc, err := configpkg.LoadFile(cfg.configPath); err == nil && cc.LocalAuth != nil {
+			localAdminUsername = cc.LocalAuth.Username
+		}
+	}
+
 	// TLS setup for the management REST API.
 	// Priority: explicit cert/key files > auto mode via internal PKI > plain HTTP.
 	var tlsCertPEM, tlsKeyPEM []byte
@@ -546,27 +711,31 @@ func run(logger *slog.Logger) error {
 	// that handleClusterStatus can test s.raftNode == nil to detect standalone
 	// mode.
 	srvCfg := server.Config{
-		Addr:            cfg.addr,
-		Logger:          logger,
-		Deployer:        orch,
-		Metrics:         regServer.Metrics(),
-		Planner:         planning.New(reg),
-		Fleet:           mgr,
-		ClusterID:       cfg.clusterID,
-		License:         lic,
-		OIDC:            oidcCfg,
-		OIDCVerifier:    oidcVerifier,
-		InternalToken:   cfg.internalToken,
-		HFToken:         cfg.hfToken,
-		TLSCert:         tlsCert,
-		TLSKey:          tlsKey,
-		TLSCertPEM:      tlsCertPEM,
-		TLSKeyPEM:       tlsKeyPEM,
-		RateLimitRPS:    cfg.rateLimitRPS,
-		RateLimitKeyRPS: cfg.rateLimitKeyRPS,
-		Reconciler:      rc,
-		SessionSecret:   sessionKey,
-		LDAPConfig:      ldapCfg,
+		Addr:              cfg.addr,
+		PublicAddr:        envOr("PURSER_PUBLIC_ADDR", ""),
+		Logger:            logger,
+		Deployer:          orch,
+		Metrics:           regServer.Metrics(),
+		NodeMetrics:       regServer.Metrics(),
+		Planner:           planning.New(reg),
+		Fleet:             mgr,
+		ClusterID:         cfg.clusterID,
+		License:           lic,
+		OIDC:              oidcCfg,
+		OIDCVerifier:      oidcVerifier,
+		InternalToken:     cfg.internalToken,
+		HFToken:           cfg.hfToken,
+		TLSCert:           tlsCert,
+		TLSKey:            tlsKey,
+		TLSCertPEM:        tlsCertPEM,
+		TLSKeyPEM:         tlsKeyPEM,
+		RateLimitRPS:      cfg.rateLimitRPS,
+		RateLimitKeyRPS:   cfg.rateLimitKeyRPS,
+		Reconciler:        rc,
+		SessionSecret:     sessionKey,
+		LDAPConfig:        ldapCfg,
+		LocalAuthUsername: localAdminUsername,
+		LocalAuthPassword: localAdminPassword,
 	}
 	if raftNode != nil {
 		srvCfg.RaftNode = raftNode

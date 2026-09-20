@@ -50,8 +50,20 @@ spec:
     - host: {{ required "ingress.host is required when ingress.enabled=true" .Values.ingress.host | quote }}
       http:
         paths:
-          {{- /* /api before /v1 before / — first-match controllers (nginx) need specific before general. */}}
+          {{- /* /api and /auth before /v1 before / — first-match controllers (nginx) need specific before general. */}}
           - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "purser.controlPlane.fullname" . }}
+                port:
+                  number: {{ .Values.controlPlane.httpPort }}
+          {{- /* /auth/* is the login/logout flow (OIDC, LDAP and local admin);
+                 it lives on the control plane, NOT under /api/v1. The UI calls
+                 these same-origin (e.g. POST /auth/local-login, GET /auth/login),
+                 so the Ingress must route /auth to the control plane or the
+                 requests fall through to the UI and fail (405/404). */}}
+          - path: /auth
             pathType: Prefix
             backend:
               service:

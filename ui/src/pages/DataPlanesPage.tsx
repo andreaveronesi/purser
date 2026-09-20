@@ -7,7 +7,8 @@
 // tier badges encode deployment weight (solid/outlined/ghost), active DPs
 // get a teal left-border accent, and the empty state shows the CP→DP
 // topology so a new operator immediately understands what to register.
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Button,
   Card,
@@ -20,11 +21,18 @@ import {
   useFieldId,
   type Tone,
 } from '../components/ui';
+import { IconTrash } from '../components/icons';
 import {
   useDataPlanes,
   useCreateDataPlane,
   useRefreshDataPlaneConfig,
+  useUpdateDataPlane,
+  useDeleteDataPlane,
+  useDataPlaneNodes,
+  useAssignNodeToDataPlane,
+  useUnassignNodeFromDataPlane,
 } from '../hooks/queries';
+import { useT } from '../i18n';
 import { relativeTime } from '../lib/format';
 import type { DataPlane, DataPlaneWithToken } from '../api/types';
 
@@ -85,8 +93,8 @@ function TierBadge({ tier }: { tier: string }) {
         borderRadius: 'var(--radius-sm)',
         fontSize: '12px',
         fontWeight: 500,
-        color: 'var(--text-muted)',
-        background: 'var(--surface-2)',
+        color: 'var(--color-text-muted)',
+        background: 'var(--color-surface-2)',
       }}
       data-testid="tier-badge"
     >
@@ -124,7 +132,7 @@ function DpStatusPill({ status }: { status: string }) {
 function ConfigSnapshotSummary({ snap }: { snap: Record<string, unknown> | null | undefined }) {
   if (!snap) {
     return (
-      <p style={{ fontSize: '13px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+      <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
         No config snapshot yet — config is pushed automatically every 30 s or via Refresh.
       </p>
     );
@@ -143,11 +151,11 @@ function ConfigSnapshotSummary({ snap }: { snap: Record<string, unknown> | null 
         fontSize: '13px',
       }}
     >
-      <dt style={{ color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', fontSize: '11px' }}>
+      <dt style={{ color: 'var(--color-text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', fontSize: '11px' }}>
         Routing entries
       </dt>
       <dd style={{ margin: 0 }}>{routingCount}</dd>
-      <dt style={{ color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', fontSize: '11px' }}>
+      <dt style={{ color: 'var(--color-text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', fontSize: '11px' }}>
         Auth keys
       </dt>
       <dd style={{ margin: 0 }}>{authCount}</dd>
@@ -159,24 +167,209 @@ function ConfigSnapshotSummary({ snap }: { snap: Record<string, unknown> | null 
 // Expanded detail panel — shown below each row when clicked.
 // ---------------------------------------------------------------------------
 
+const SECTION_LABEL_STYLE: CSSProperties = {
+  fontSize: '12px',
+  fontWeight: 700,
+  textTransform: 'uppercase',
+  letterSpacing: '0.05em',
+  color: 'var(--color-text-muted)',
+  margin: 0,
+};
+
+// ---------------------------------------------------------------------------
+// Assigned-nodes section — list, assign, and (arm→confirm) unassign.
+// ---------------------------------------------------------------------------
+
+function DpNodesSection({ dp }: { dp: DataPlane }) {
+  const t = useT();
+  const { data: nodes, isLoading, isError, error, refetch } = useDataPlaneNodes(dp.id);
+  const assign = useAssignNodeToDataPlane();
+  const unassign = useUnassignNodeFromDataPlane();
+  const [newNodeId, setNewNodeId] = useState('');
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const nodeInputId = useFieldId('dp-assign-node');
+
+  function handleAssign() {
+    const id = newNodeId.trim();
+    if (!id) return;
+    void assign.mutateAsync({ id: dp.id, nodeId: id })
+      .then(() => setNewNodeId(''))
+      .catch(() => { /* surfaced below */ });
+  }
+
+  function handleUnassign(nodeId: string) {
+    if (confirmingId !== nodeId) {
+      setConfirmingId(nodeId);
+      return;
+    }
+    void unassign.mutateAsync({ id: dp.id, nodeId })
+      .then(() => setConfirmingId(null))
+      .catch(() => setConfirmingId(null));
+  }
+
+  const rows = nodes ?? [];
+
+  return (
+    <div>
+      <p style={{ ...SECTION_LABEL_STYLE, marginBottom: '8px' }}>
+        {t('platform.dataplanes.nodes.title')}
+      </p>
+      {isLoading && <LoadingBlock />}
+      {isError && (
+        <ErrorState
+          message={error instanceof Error ? error.message : t('error.dataplaneNodes')}
+          onRetry={() => void refetch()}
+        />
+      )}
+      {!isLoading && !isError && rows.length === 0 && (
+        <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', margin: '0 0 10px' }}>
+          {t('platform.dataplanes.nodes.empty')}
+        </p>
+      )}
+      {rows.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '10px' }}>
+          {rows.map((node) => (
+            <span
+              key={node.id}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: 'var(--color-surface)',
+                border: '1px solid var(--color-border)',
+                borderRadius: 'var(--radius-sm)',
+                padding: '3px 8px',
+                fontSize: '13px',
+              }}
+            >
+              <code style={{ fontFamily: 'var(--font-mono)', fontSize: '12px' }}>{node.hostname || node.id}</code>
+              {node.state && <span className="muted" style={{ fontSize: '11px' }}>{node.state}</span>}
+              {confirmingId === node.id ? (
+                <>
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    disabled={unassign.isPending}
+                    onClick={() => handleUnassign(node.id)}
+                    data-testid={`unassign-node-confirm-${node.id}`}
+                  >
+                    {t('platform.dataplanes.nodes.unassignConfirm')}
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => setConfirmingId(null)}>
+                    {t('action.cancel')}
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  aria-label={t('platform.dataplanes.nodes.unassign')}
+                  onClick={() => handleUnassign(node.id)}
+                  data-testid={`unassign-node-${node.id}`}
+                  style={{ padding: '0 4px' }}
+                >
+                  <IconTrash />
+                </Button>
+              )}
+            </span>
+          ))}
+        </div>
+      )}
+      <div style={{ display: 'flex', gap: '8px' }}>
+        <input
+          id={nodeInputId}
+          className="input"
+          value={newNodeId}
+          placeholder={t('platform.dataplanes.nodes.placeholder')}
+          onChange={(e) => setNewNodeId(e.target.value)}
+          style={{ maxWidth: 220 }}
+          aria-label={t('platform.dataplanes.nodes.assign')}
+          data-testid="assign-node-input"
+        />
+        <Button
+          variant="secondary"
+          size="sm"
+          disabled={!newNodeId.trim() || assign.isPending}
+          onClick={handleAssign}
+          data-testid="assign-node-btn"
+        >
+          {t('platform.dataplanes.nodes.assign')}
+        </Button>
+      </div>
+      {assign.isError && (
+        <p style={{ color: 'var(--color-danger)', fontSize: '12px', marginTop: '6px' }}>
+          {assign.error instanceof Error ? assign.error.message : t('error.dataplaneNodes')}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function DpDetailPanel({ dp, onRefresh }: { dp: DataPlane; onRefresh: () => void }) {
+  const t = useT();
   const refresh = useRefreshDataPlaneConfig();
+  const del = useDeleteDataPlane();
+  const [editing, setEditing] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+
+  function handleDelete() {
+    if (!confirmingDelete) {
+      setConfirmingDelete(true);
+      return;
+    }
+    void del.mutateAsync(dp.id)
+      .then(() => setConfirmingDelete(false))
+      .catch(() => setConfirmingDelete(false));
+  }
+
   return (
     <div
       style={{
-        background: 'var(--surface-2)',
-        borderRadius: 'var(--radius)',
+        background: 'var(--color-surface-2)',
+        borderRadius: 'var(--radius-md)',
         padding: '14px 18px',
         display: 'grid',
         gap: '16px',
       }}
     >
+      {/* Lifecycle actions: edit + delete (arm→confirm) */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+        <Button size="sm" variant="secondary" onClick={() => setEditing(true)} data-testid="edit-dp-btn">
+          {t('platform.dataplanes.edit')}
+        </Button>
+        <Button
+          size="sm"
+          variant={confirmingDelete ? 'danger' : 'ghost'}
+          onClick={handleDelete}
+          disabled={del.isPending}
+          aria-label={t('platform.dataplanes.delete')}
+          data-testid={confirmingDelete ? 'delete-dp-confirm' : 'delete-dp-btn'}
+        >
+          {confirmingDelete
+            ? t('platform.dataplanes.deleteConfirm', { name: dp.name })
+            : (del.isPending ? t('platform.dataplanes.deleting') : t('platform.dataplanes.delete'))}
+        </Button>
+        {confirmingDelete && (
+          <Button size="sm" variant="secondary" onClick={() => setConfirmingDelete(false)}>
+            {t('action.cancel')}
+          </Button>
+        )}
+      </div>
+      {confirmingDelete && (
+        <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: 0 }}>
+          {t('platform.dataplanes.deleteHint')}
+        </p>
+      )}
+      {del.isError && (
+        <p style={{ color: 'var(--color-danger)', fontSize: '12px', margin: 0 }}>
+          {del.error instanceof Error ? del.error.message : t('platform.dataplanes.delete')}
+        </p>
+      )}
+
       {/* Config snapshot */}
       <div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-          <p style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', margin: 0 }}>
-            Config snapshot
-          </p>
+          <p style={SECTION_LABEL_STYLE}>Config snapshot</p>
           <Button
             size="sm"
             variant="secondary"
@@ -190,27 +383,110 @@ function DpDetailPanel({ dp, onRefresh }: { dp: DataPlane; onRefresh: () => void
         <ConfigSnapshotSummary snap={dp.configSnapshot as Record<string, unknown> | null | undefined} />
       </div>
 
-      {/* Join token note */}
-      <div>
-        <p style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: '6px' }}>
-          Join token
-        </p>
-        <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-          The join token was shown once at registration. To connect a new Gateway,
-          delete this Data Plane and register again, or contact your administrator to rotate the token.
-        </p>
-      </div>
+      {/* Assigned nodes */}
+      <DpNodesSection dp={dp} />
 
       {/* Data plane ID */}
       <div>
-        <p style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: '4px' }}>
-          Data Plane ID
-        </p>
-        <code style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', background: 'var(--surface)', padding: '3px 8px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+        <p style={{ ...SECTION_LABEL_STYLE, marginBottom: '4px' }}>Data Plane ID</p>
+        <code style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', background: 'var(--color-surface)', padding: '3px 8px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}>
           {dp.id}
         </code>
       </div>
+
+      {editing && <EditDpModal dp={dp} onClose={() => setEditing(false)} />}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Edit modal — mutable DP fields (name, tier, gateway URL, description, status).
+// Mirrors the Register modal layout; submits via useUpdateDataPlane.
+// ---------------------------------------------------------------------------
+
+function EditDpModal({ dp, onClose }: { dp: DataPlane; onClose: () => void }) {
+  const t = useT();
+  const update = useUpdateDataPlane();
+  const [name, setName] = useState(dp.name);
+  const [tier, setTier] = useState(dp.tier || 'production');
+  const [gatewayUrl, setGatewayUrl] = useState(dp.gatewayUrl ?? '');
+  const [description, setDescription] = useState(dp.description ?? '');
+  const nameId = useFieldId('edit-dp-name');
+  const tierId = useFieldId('edit-dp-tier');
+  const gwId = useFieldId('edit-dp-gw');
+  const descId = useFieldId('edit-dp-desc');
+
+  function submit() {
+    if (!name.trim()) return;
+    void update.mutateAsync({
+      id: dp.id,
+      input: {
+        name: name.trim(),
+        tier,
+        gatewayUrl: gatewayUrl.trim(),
+        description: description.trim(),
+      },
+    }).then(onClose).catch(() => { /* surfaced below */ });
+  }
+
+  return (
+    <Modal
+      title={t('platform.dataplanes.editTitle')}
+      onClose={onClose}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>{t('action.cancel')}</Button>
+          <Button
+            variant="primary"
+            onClick={submit}
+            disabled={update.isPending || !name.trim()}
+            data-testid="edit-dp-submit"
+          >
+            {update.isPending ? t('platform.dataplanes.saving') : t('platform.dataplanes.save')}
+          </Button>
+        </>
+      }
+    >
+      <Field label={t('platform.dataplanes.field.name')} htmlFor={nameId}>
+        <input
+          id={nameId}
+          className="input"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          data-testid="edit-dp-name"
+        />
+      </Field>
+      <Field label={t('platform.dataplanes.field.tier')} htmlFor={tierId}>
+        <select id={tierId} className="input" value={tier} onChange={(e) => setTier(e.target.value)} data-testid="edit-dp-tier">
+          <option value="production">production</option>
+          <option value="staging">staging</option>
+          <option value="development">development</option>
+        </select>
+      </Field>
+      <Field label={t('platform.dataplanes.field.gatewayUrl')} htmlFor={gwId}>
+        <input
+          id={gwId}
+          className="input"
+          type="url"
+          value={gatewayUrl}
+          onChange={(e) => setGatewayUrl(e.target.value)}
+          data-testid="edit-dp-gateway"
+        />
+      </Field>
+      <Field label={t('platform.dataplanes.field.description')} htmlFor={descId}>
+        <input
+          id={descId}
+          className="input"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+        />
+      </Field>
+      {update.isError && (
+        <p style={{ color: 'var(--color-danger)', fontSize: '13px' }}>
+          {update.error instanceof Error ? update.error.message : 'Error updating data plane'}
+        </p>
+      )}
+    </Modal>
   );
 }
 
@@ -219,7 +495,8 @@ function DpDetailPanel({ dp, onRefresh }: { dp: DataPlane; onRefresh: () => void
 // Shown when no Data Planes are registered.
 // ---------------------------------------------------------------------------
 
-function DataPlanesEmptyState() {
+function DataPlanesEmptyState({ onRegister }: { onRegister?: () => void }) {
+  const t = useT();
   return (
     <div
       style={{
@@ -230,17 +507,17 @@ function DataPlanesEmptyState() {
         gap: '20px',
       }}
     >
-      {/* ASCII-style topology diagram */}
+      {/* ASCII-style topology diagram — kept for visual context */}
       <svg
         width="320"
         height="120"
         viewBox="0 0 320 120"
         fill="none"
         aria-hidden="true"
-        style={{ color: 'var(--text-muted)' }}
+        style={{ color: 'var(--color-text-muted)' }}
       >
         {/* Control Plane box */}
-        <rect x="4" y="30" width="90" height="60" rx="8" stroke="currentColor" strokeWidth="1.5" fill="var(--surface-2)" />
+        <rect x="4" y="30" width="90" height="60" rx="8" stroke="currentColor" strokeWidth="1.5" fill="var(--color-surface-2)" />
         <text x="49" y="56" textAnchor="middle" fontSize="10" fontWeight="600" fill="currentColor">Control</text>
         <text x="49" y="70" textAnchor="middle" fontSize="10" fontWeight="600" fill="currentColor">Plane</text>
 
@@ -250,7 +527,7 @@ function DataPlanesEmptyState() {
         <text x="121" y="52" textAnchor="middle" fontSize="9" fill="currentColor">mTLS</text>
 
         {/* Data Plane box */}
-        <rect x="148" y="20" width="100" height="80" rx="8" stroke="#0d9488" strokeWidth="2" fill="var(--surface-2)" />
+        <rect x="148" y="20" width="100" height="80" rx="8" stroke="#0d9488" strokeWidth="2" fill="var(--color-surface-2)" />
         <text x="198" y="50" textAnchor="middle" fontSize="10" fontWeight="700" fill="#0d9488">Data Plane</text>
         <text x="198" y="64" textAnchor="middle" fontSize="9" fill="currentColor">Gateway</text>
         <text x="198" y="78" textAnchor="middle" fontSize="9" fill="currentColor">+ GPU nodes</text>
@@ -261,17 +538,30 @@ function DataPlanesEmptyState() {
         <text x="269" y="52" textAnchor="middle" fontSize="9" fill="currentColor">/v1/</text>
 
         {/* Clients box */}
-        <rect x="298" y="42" width="18" height="36" rx="4" stroke="currentColor" strokeWidth="1.5" fill="var(--surface-2)" />
+        <rect x="298" y="42" width="18" height="36" rx="4" stroke="currentColor" strokeWidth="1.5" fill="var(--color-surface-2)" />
         <text x="307" y="57" textAnchor="middle" fontSize="8" fill="currentColor">CLI</text>
         <text x="307" y="69" textAnchor="middle" fontSize="8" fill="currentColor">API</text>
       </svg>
 
-      <div style={{ textAlign: 'center', maxWidth: '360px' }}>
-        <p style={{ fontWeight: 600, marginBottom: '8px' }}>No Data Planes registered</p>
-        <p style={{ color: 'var(--text-muted)', fontSize: '14px', lineHeight: 1.6 }}>
-          Register your first Data Plane to connect an inference cluster.
-          Each DP registers with a one-time join token and receives config snapshots from this Control Plane.
+      <div style={{ textAlign: 'center', maxWidth: '400px' }}>
+        <p style={{ fontWeight: 600, marginBottom: '8px' }}>{t('platform.dataplanes.emptyTitle')}</p>
+        <p style={{ color: 'var(--color-text-muted)', fontSize: '14px', lineHeight: 1.6 }}>
+          {t('platform.dataplanes.emptyExplain')}
         </p>
+        <p style={{ color: 'var(--color-text-muted)', fontSize: '14px', lineHeight: 1.6, marginTop: '8px' }}>
+          {t('platform.dataplanes.emptyNodesNote')}
+        </p>
+      </div>
+
+      <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
+        {onRegister && (
+          <Button variant="primary" size="sm" onClick={onRegister}>
+            {t('platform.dataplanes.emptyRegisterCta')}
+          </Button>
+        )}
+        <Link to="/platform/fleet" style={{ fontSize: '14px' }}>
+          {t('platform.dataplanes.emptyFleetLink')}
+        </Link>
       </div>
     </div>
   );
@@ -394,10 +684,10 @@ function JoinTokenModal({ result, onClose }: { result: DataPlaneWithToken; onClo
           display: 'flex',
           alignItems: 'center',
           gap: '10px',
-          background: 'var(--surface-2)',
-          borderRadius: 'var(--radius)',
+          background: 'var(--color-surface-2)',
+          borderRadius: 'var(--radius-md)',
           padding: '10px 14px',
-          border: '1px solid var(--border)',
+          border: '1px solid var(--color-border)',
         }}
       >
         <code
@@ -408,7 +698,7 @@ function JoinTokenModal({ result, onClose }: { result: DataPlaneWithToken; onClo
         </code>
         <CopyButton value={result.joinToken} />
       </div>
-      <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+      <p style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>
         Data Plane: <strong>{result.dataplane.name}</strong>
       </p>
     </Modal>
@@ -450,7 +740,7 @@ export function DataPlanesPage() {
             onRetry={() => refetch()}
           />
         )}
-        {data && data.length === 0 && <DataPlanesEmptyState />}
+        {data && data.length === 0 && <DataPlanesEmptyState onRegister={() => setShowRegister(true)} />}
         {data && data.length > 0 && (
           <div className="table-wrap">
             <table className="table">
@@ -483,7 +773,7 @@ export function DataPlanesPage() {
                             width: '0.8em',
                             marginRight: '6px',
                             fontSize: '0.65em',
-                            color: 'var(--text-muted)',
+                            color: 'var(--color-text-muted)',
                             transition: 'transform 150ms ease',
                             transform: expandedId === dp.id ? 'rotate(90deg)' : 'rotate(0deg)',
                           }}
@@ -492,7 +782,7 @@ export function DataPlanesPage() {
                         </span>
                         {dp.name}
                         {dp.description && (
-                          <span style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', fontWeight: 400 }}>
+                          <span style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-muted)', fontWeight: 400 }}>
                             {dp.description}
                           </span>
                         )}

@@ -1,6 +1,7 @@
 /// <reference types="vitest" />
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
 
 // Purser UI build config.
 //
@@ -8,9 +9,11 @@ import react from '@vitejs/plugin-react';
 //   the control plane can serve the SPA from any mount path (e.g. `/ui/`) and
 //   the bundle stays fully self-contained. No absolute host is ever baked in.
 // - The whole app is bundled locally (no CDN/runtime external requests), which
-//   satisfies the air-gap requirement.
+//   satisfies the air-gap requirement. Tailwind is compiled by the Vite plugin
+//   at build time — never the CDN "play" script — so that guarantee still holds
+//   and the browser makes no extra request for styles.
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
   base: './',
   server: {
     proxy: {

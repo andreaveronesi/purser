@@ -305,4 +305,274 @@ describe('AuditPage — enterprise license gate', () => {
     expect(link).toBeInTheDocument();
     expect(link.getAttribute('href')).toContain('enterprise');
   });
+
+  it('shows generic error alert and retry for non-license chain verify error', () => {
+    vi.clearAllMocks();
+    const refetch = vi.fn();
+    vi.mocked(useAuditChainVerify).mockReturnValue(
+      qr({ isError: true, error: new Error('server error'), refetch }),
+    );
+    mockInference();
+    mockAccess();
+
+    renderPage();
+
+    // Not a license error → generic ErrorState renders (not enterprise gate)
+    expect(screen.queryByText('Enterprise feature')).not.toBeInTheDocument();
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    // Retry callback is wired up
+    fireEvent.click(screen.getByRole('button', { name: /retry/i }));
+    expect(refetch).toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Loading states
+// ---------------------------------------------------------------------------
+
+describe('AuditPage — loading states', () => {
+  it('shows spinner while chain integrity is loading', () => {
+    vi.clearAllMocks();
+    vi.mocked(useAuditChainVerify).mockReturnValue(qr({ isLoading: true }));
+    mockInference();
+    mockAccess();
+    renderPage();
+    expect(screen.getByRole('status')).toBeInTheDocument();
+  });
+
+  it('shows spinner while inference audit is loading', () => {
+    vi.clearAllMocks();
+    mockChain();
+    vi.mocked(useInferenceAudit).mockReturnValue(qr({ isLoading: true }));
+    mockAccess();
+    renderPage();
+    expect(screen.getByRole('status')).toBeInTheDocument();
+  });
+
+  it('shows empty state when inference audit has no events', () => {
+    vi.clearAllMocks();
+    mockChain();
+    vi.mocked(useInferenceAudit).mockReturnValue(
+      qr({ data: { total: 0, events: [] } }),
+    );
+    mockAccess();
+    renderPage();
+    expect(screen.getByText('No inference events yet.')).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Inference audit — pagination
+// ---------------------------------------------------------------------------
+
+describe('AuditPage — inference audit pagination', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockChain();
+    // Return 55 events so there's a "next" page (PAGE_SIZE = 50)
+    const events = Array.from({ length: 55 }, (_, i) => ({
+      seq: i + 1,
+      modelId: 'llama3-8b',
+      modelRevision: 'main',
+      modelQuantization: 'Q4_K_M',
+      tenant: 'acme',
+      apiKeyId: `key-${i}`,
+      nodeId: 'node-1',
+      inferenceEngine: 'llamacpp',
+      inputTokens: 100,
+      outputTokens: 50,
+      latencyMs: 200,
+      status: 'ok' as const,
+      createdAt: '2026-09-08T14:23:07Z',
+      hash: `hash${i}`,
+      prevHash: `hash${i - 1}`,
+    }));
+    vi.mocked(useInferenceAudit).mockReturnValue(
+      qr({ data: { total: 55, events } }),
+    );
+    mockAccess();
+  });
+
+  it('next page button is enabled when there are more events', () => {
+    renderPage();
+    const nextBtn = screen.getByRole('button', { name: /next/i });
+    expect(nextBtn).not.toBeDisabled();
+  });
+
+  it('prev button is disabled on first page', () => {
+    renderPage();
+    const prevBtn = screen.getByRole('button', { name: /prev/i });
+    expect(prevBtn).toBeDisabled();
+  });
+
+  it('clicking next page advances offset and re-calls hook with new offset', () => {
+    renderPage();
+    const nextBtn = screen.getByRole('button', { name: /next/i });
+    fireEvent.click(nextBtn);
+    // After advancing, useInferenceAudit should be called with offset >= 50
+    const calls = vi.mocked(useInferenceAudit).mock.calls as Array<[{ offset: number }]>;
+    expect(calls.some((c) => c[0]?.offset >= 50)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Inference audit — filter interactions
+// ---------------------------------------------------------------------------
+
+describe('AuditPage — inference audit filters', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockChain();
+    mockInference();
+    mockAccess();
+  });
+
+  it('model filter select exists with an "all" option', () => {
+    renderPage();
+    const select = screen.getByRole('combobox', { name: /model/i });
+    expect(select).toBeInTheDocument();
+  });
+
+  it('changing model filter calls useInferenceAudit with modelId param', () => {
+    renderPage();
+    // The model select is populated with models from events
+    const select = screen.getByRole('combobox', { name: /model/i });
+    // Options include "all" and the model names from events
+    fireEvent.change(select, { target: { value: 'llama3-8b' } });
+    const calls = vi.mocked(useInferenceAudit).mock.calls as Array<[{ modelId?: string }]>;
+    expect(calls.some((c) => c[0]?.modelId === 'llama3-8b')).toBe(true);
+  });
+
+  it('refresh button click triggers refetch', () => {
+    const refetch = vi.fn();
+    vi.mocked(useInferenceAudit).mockReturnValue(qr({ data: MOCK_AUDIT, refetch }));
+    renderPage();
+    const refreshBtn = screen.getByRole('button', { name: /refresh/i });
+    fireEvent.click(refreshBtn);
+    expect(refetch).toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Inference CSV export
+// ---------------------------------------------------------------------------
+
+describe('AuditPage — CSV export', () => {
+  beforeAll(() => {
+    (URL as unknown as { createObjectURL: () => string }).createObjectURL = vi.fn(() => 'blob:mock');
+    (URL as unknown as { revokeObjectURL: () => void }).revokeObjectURL = vi.fn();
+    HTMLAnchorElement.prototype.click = vi.fn();
+  });
+
+  it('CSV export button is disabled when no events', () => {
+    vi.clearAllMocks();
+    mockChain();
+    vi.mocked(useInferenceAudit).mockReturnValue(qr({ data: { total: 0, events: [] } }));
+    mockAccess();
+    renderPage();
+    const exportBtn = screen.getByRole('button', { name: /export csv/i });
+    expect(exportBtn).toBeDisabled();
+  });
+
+  it('CSV export button is enabled and triggers download when events exist', () => {
+    vi.clearAllMocks();
+    mockChain();
+    mockInference();
+    mockAccess();
+    const createObjectURL = vi.fn(() => 'blob:mock');
+    (URL as unknown as { createObjectURL: typeof createObjectURL }).createObjectURL = createObjectURL;
+    renderPage();
+    const exportBtn = screen.getByRole('button', { name: /export csv/i });
+    expect(exportBtn).not.toBeDisabled();
+    fireEvent.click(exportBtn);
+    expect(createObjectURL).toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Access log — loading/error/empty states
+// ---------------------------------------------------------------------------
+
+describe('AuditPage — access log states', () => {
+  it('shows error state in access log tab when useAccessLog errors', () => {
+    vi.clearAllMocks();
+    mockChain();
+    mockInference();
+    vi.mocked(useAccessLog).mockReturnValue(qr({ isError: true, error: new Error('network error') }));
+    renderPage();
+    fireEvent.click(screen.getByRole('tab', { name: /access log/i }));
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+  });
+
+  it('shows empty state in access log tab when no entries', () => {
+    vi.clearAllMocks();
+    mockChain();
+    mockInference();
+    vi.mocked(useAccessLog).mockReturnValue(qr({ data: { count: 0, entries: [] } }));
+    renderPage();
+    fireEvent.click(screen.getByRole('tab', { name: /access log/i }));
+    expect(screen.getByText('No access log entries.')).toBeInTheDocument();
+  });
+
+  it('access log shows status code badge with values from real shape', () => {
+    vi.clearAllMocks();
+    mockChain();
+    mockInference();
+    mockAccess();
+    renderPage();
+    fireEvent.click(screen.getByRole('tab', { name: /access log/i }));
+    // MOCK_ACCESS_LOG has statusCode: 200 → success badge
+    expect(screen.getByText('200')).toBeInTheDocument();
+    // Also check method POST renders
+    expect(screen.getByText('POST')).toBeInTheDocument();
+  });
+
+  it('refresh button in access log triggers refetch', () => {
+    vi.clearAllMocks();
+    mockChain();
+    mockInference();
+    const refetch = vi.fn();
+    vi.mocked(useAccessLog).mockReturnValue(qr({ data: MOCK_ACCESS_LOG, refetch }));
+    renderPage();
+    fireEvent.click(screen.getByRole('tab', { name: /access log/i }));
+    const refreshBtn = screen.getByRole('button', { name: /refresh/i });
+    fireEvent.click(refreshBtn);
+    expect(refetch).toHaveBeenCalled();
+  });
+
+  it('access log error state retry button calls refetch', () => {
+    vi.clearAllMocks();
+    mockChain();
+    mockInference();
+    const refetch = vi.fn();
+    vi.mocked(useAccessLog).mockReturnValue(
+      qr({ isError: true, error: new Error('network error'), refetch }),
+    );
+    renderPage();
+    fireEvent.click(screen.getByRole('tab', { name: /access log/i }));
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /retry/i }));
+    expect(refetch).toHaveBeenCalled();
+  });
+
+  it('access log shows danger badge for 5xx status code', () => {
+    vi.clearAllMocks();
+    mockChain();
+    mockInference();
+    vi.mocked(useAccessLog).mockReturnValue(
+      qr({
+        data: {
+          count: 1,
+          entries: [{
+            id: 9999, apiKeyId: 'key-x', method: 'POST',
+            path: '/v1/completions', ipPrefix: '10.0.0.0/24',
+            userAgent: 'test', statusCode: 503, requestAt: '2026-09-08T14:00:00Z',
+          }],
+        },
+      }),
+    );
+    renderPage();
+    fireEvent.click(screen.getByRole('tab', { name: /access log/i }));
+    expect(screen.getByText('503')).toBeInTheDocument();
+  });
 });

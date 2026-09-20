@@ -104,6 +104,52 @@ First, a correction that resolves most confusion: **there is no `PENDING`
 deployment state.** The lifecycle states are `PLANNED`, `PROVISIONING`, `ACTIVE`,
 `REBALANCING`, `STOPPING`, `STOPPED`, and `FAILED`.
 
+| State | Meaning |
+|---|---|
+| `PLANNED` | Deployment row created; rollout not yet started. |
+| `PROVISIONING` | Nodes are loading model layers (rolling out). |
+| `ACTIVE` | All assigned nodes are running; the model is serving requests. |
+| `REBALANCING` | A node change triggered layer redistribution; requests continue. |
+| `STOPPING` | Undeploy requested; nodes are tearing down their engines. |
+| `STOPPED` | All engines stopped; the deployment is no longer serving. |
+| `FAILED` | Rollout could not complete (e.g. a node crashed mid-load). |
+
+The operator dashboard badge on the Deployments page reflects each of these states
+with a distinct label and colour. If a deployment is `STOPPED` or `FAILED` it will
+**not** show "Rolling out" — those labels are state-specific.
+
+### How are deployments grouped on the Deployments page?
+
+The Deployments page splits records into two sections:
+
+- **Active deployments** — states `PLANNED`, `PROVISIONING`, `ACTIVE`,
+  `REBALANCING`, and `STOPPING`. These deployments are live or transitioning; the
+  model may or may not be answering requests depending on the state.
+- **Not serving** — states `STOPPED` and `FAILED`. These deployments are at rest
+  and not handling any traffic.
+
+If the "Active deployments" section shows _"No active deployments"_, all your
+deployments are currently stopped. Use the **Configure and start** button on any
+card in the "Not serving" section to re-plan and re-launch that deployment.
+
+The model health badge ("Healthy", "Degraded", "Not serving") reflects whether the
+model is currently reachable through the gateway — it is independent of the
+deployment state badge and can differ (e.g. a deployment that just became `ACTIVE`
+may take a moment before the gateway health check turns green).
+
+### Why does a STOPPED deployment show "0 nodes" with an error message?
+
+When the control plane cannot place a deployment (e.g. the assigned host node goes
+offline after scheduling), it records the reason in the deployment detail:
+`detail.error` (for example `"host node-abc123 not ready"`). The dashboard now
+surfaces that message directly below the `Stopped` state badge so you can see why
+the deployment stalled — it is not a UI corruption or a data problem.
+
+**Recovery:** the deployment is already stopped — there is nothing to undo. To
+bring the model back, click **Configure and start** on the deployment card (or go
+to **Catalog → Deploy** for the same model). The planner will reassign it to nodes
+that are currently `READY`.
+
 That matters because when a model cannot be planned, **no deployment row is
 created at all** — the deploy call itself returns `422` with
 `"error": "model_does_not_fit"` and a reason. There is nothing to get stuck. If

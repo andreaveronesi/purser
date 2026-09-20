@@ -47,16 +47,11 @@ const featureGDPR = "gdpr"
 // The operation pseudonymises (does NOT hard-delete) inference_audit_log rows
 // for the subject so the tamper-evident hash chain stays intact. The erasure is
 // recorded in the immutable gdpr_erasure_log and in the admin audit trail.
+// Auth: platform:orgs:delete enforced by routePermission in rbacMiddleware (Wave 3).
+// Inline requestIsAdmin removed — routePermission is the single enforcement point.
 func (s *Server) handleGDPRErasure(w http.ResponseWriter, r *http.Request) {
 	if !s.licenseAllows(featureGDPR) {
 		s.writeLicenseRequired(w, featureGDPR)
-		return
-	}
-
-	// Admin-only belt-and-suspenders guard (rbacMiddleware has already enforced
-	// RBAC but this is a destructive / compliance-critical operation).
-	if !s.requestIsAdmin(r) {
-		s.writeError(w, http.StatusForbidden, "forbidden", "admin role required")
 		return
 	}
 
@@ -130,13 +125,10 @@ func (s *Server) handleGDPRErasure(w http.ResponseWriter, r *http.Request) {
 // Note: full listing (pagination, filtering) is planned for v0.4. This
 // endpoint currently returns an empty list so tooling can discover the
 // endpoint exists.
+// Auth: platform:orgs:delete enforced by routePermission in rbacMiddleware (Wave 3).
 func (s *Server) handleGDPRErasureLog(w http.ResponseWriter, r *http.Request) {
 	if !s.licenseAllows(featureGDPR) {
 		s.writeLicenseRequired(w, featureGDPR)
-		return
-	}
-	if !s.requestIsAdmin(r) {
-		s.writeError(w, http.StatusForbidden, "forbidden", "admin role required")
 		return
 	}
 	s.writeJSON(w, http.StatusOK, map[string]any{

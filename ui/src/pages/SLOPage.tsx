@@ -71,8 +71,8 @@ function WindowSelector({
       style={{
         display: 'inline-flex',
         gap: '2px',
-        background: 'var(--surface-2, var(--bg))',
-        border: '1px solid var(--border)',
+        background: 'var(--surface-2, var(--color-bg))',
+        border: '1px solid var(--color-border)',
         borderRadius: '6px',
         padding: '2px',
       }}
@@ -92,8 +92,8 @@ function WindowSelector({
               cursor: 'pointer',
               fontWeight: active ? 600 : 400,
               fontSize: '0.82em',
-              background: active ? 'var(--accent)' : 'transparent',
-              color: active ? '#fff' : 'var(--text-muted, var(--text))',
+              background: active ? 'var(--color-accent)' : 'transparent',
+              color: active ? '#fff' : 'var(--text-muted, var(--color-text))',
               transition: 'background 0.15s, color 0.15s',
             }}
           >
@@ -119,10 +119,10 @@ function KpiTile({
   tone?: 'success' | 'danger' | 'neutral' | 'normal';
 }) {
   const valueColor =
-    tone === 'success' ? 'var(--success-fg)'
-    : tone === 'danger'  ? 'var(--danger-fg)'
-    : tone === 'neutral' ? 'var(--text-muted, var(--muted))'
-    : 'var(--text)';
+    tone === 'success' ? 'var(--color-success)'
+    : tone === 'danger'  ? 'var(--color-danger)'
+    : tone === 'neutral' ? 'var(--text-muted, var(--color-text-muted))'
+    : 'var(--color-text)';
 
   return (
     <div
@@ -130,9 +130,9 @@ function KpiTile({
         flex: '1 1 0',
         minWidth: '80px',
         padding: '0.85rem 1rem',
-        background: 'var(--surface-2, var(--bg))',
-        border: '1px solid var(--border)',
-        borderRadius: 'var(--radius)',
+        background: 'var(--surface-2, var(--color-bg))',
+        border: '1px solid var(--color-border)',
+        borderRadius: 'var(--radius-md)',
         display: 'flex',
         flexDirection: 'column',
         gap: '0.2rem',
@@ -141,7 +141,7 @@ function KpiTile({
       <span style={{ fontSize: '1.6rem', fontWeight: 700, lineHeight: 1, color: valueColor }}>
         {value}
       </span>
-      <span style={{ fontSize: '0.78em', color: 'var(--text-muted, var(--muted))', lineHeight: 1.3 }}>
+      <span style={{ fontSize: '0.78em', color: 'var(--text-muted, var(--color-text-muted))', lineHeight: 1.3 }}>
         {label}
       </span>
     </div>
@@ -194,7 +194,7 @@ function ComplianceRow({ model }: { model: SloModelEntry }) {
         {model.actual.ttft_compliance !== null ? (
           <span style={{
             fontWeight: 600,
-            color: model.status === 'breached' ? 'var(--danger-fg)' : model.status === 'met' ? 'var(--success-fg)' : 'var(--text)',
+            color: model.status === 'breached' ? 'var(--color-danger)' : model.status === 'met' ? 'var(--color-success)' : 'var(--color-text)',
           }}>
             {ttftPct}
           </span>
@@ -251,7 +251,7 @@ export function SLOPage() {
               href="https://andrew19881123.github.io/purser/enterprise/slo/"
               target="_blank"
               rel="noreferrer"
-              style={{ fontSize: '0.875em', color: 'var(--accent)', textDecoration: 'none', fontWeight: 500 }}
+              style={{ fontSize: '0.875em', color: 'var(--color-accent)', textDecoration: 'none', fontWeight: 500 }}
             >
               {t('slo.configLink')}
             </a>
@@ -279,20 +279,20 @@ export function SLOPage() {
               display: 'flex',
               flexDirection: 'column',
               gap: '10px',
-              background: 'var(--info-bg)',
-              border: '1px solid color-mix(in srgb, var(--info-fg) 25%, transparent)',
-              borderRadius: 'var(--radius)',
+              background: 'var(--color-info-bg)',
+              border: '1px solid color-mix(in srgb, var(--color-info) 25%, transparent)',
+              borderRadius: 'var(--radius-md)',
               padding: '20px 24px',
             }}
             role="status"
           >
-            <strong style={{ color: 'var(--info-fg)' }}>{t('slo.enterprise.title')}</strong>
+            <strong style={{ color: 'var(--color-info)' }}>{t('slo.enterprise.title')}</strong>
             <p style={{ margin: 0, fontSize: '0.9em' }}>{t('slo.enterprise.desc')}</p>
             <a
               href="https://andrew19881123.github.io/purser/enterprise/licensing/"
               target="_blank"
               rel="noreferrer"
-              style={{ color: 'var(--info-fg)', fontWeight: 600, fontSize: '0.875em' }}
+              style={{ color: 'var(--color-info)', fontWeight: 600, fontSize: '0.875em' }}
             >
               {t('policies.enterprise.link')}
             </a>
@@ -339,13 +339,13 @@ export function SLOPage() {
 
       {/* "Configure SLOs" hint at the bottom when data exists */}
       {!isLoading && !isError && models.length > 0 && (
-        <p style={{ fontSize: '0.82em', color: 'var(--text-muted, var(--muted))', marginTop: '0.5rem' }}>
+        <p style={{ fontSize: '0.82em', color: 'var(--text-muted, var(--color-text-muted))', marginTop: '0.5rem' }}>
           SLO thresholds are configured in{' '}
           <a
             href="https://andrew19881123.github.io/purser/enterprise/slo/"
             target="_blank"
             rel="noreferrer"
-            style={{ color: 'var(--accent)' }}
+            style={{ color: 'var(--color-accent)' }}
           >
             purser.yaml
           </a>.

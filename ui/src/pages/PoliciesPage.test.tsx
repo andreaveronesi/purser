@@ -263,6 +263,87 @@ describe('PoliciesPage — empty state', () => {
   });
 });
 
+describe('PoliciesPage — delete policy', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAll([POLICY_WITH_COMMENT]);
+  });
+
+  it('calls deletePolicy when window.confirm returns true', () => {
+    const deleteMutate = vi.fn();
+    vi.mocked(useDeletePolicy).mockReturnValue(mut({ mutate: deleteMutate }));
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: /^delete$/i }));
+    expect(deleteMutate).toHaveBeenCalledWith('allow-approved-models');
+    vi.restoreAllMocks();
+  });
+
+  it('does NOT call deletePolicy when window.confirm returns false', () => {
+    const deleteMutate = vi.fn();
+    vi.mocked(useDeletePolicy).mockReturnValue(mut({ mutate: deleteMutate }));
+    vi.spyOn(window, 'confirm').mockReturnValue(false);
+
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: /^delete$/i }));
+    expect(deleteMutate).not.toHaveBeenCalled();
+    vi.restoreAllMocks();
+  });
+
+  it('closes source panel when the policy being viewed is deleted', () => {
+    const deleteMutate = vi.fn();
+    vi.mocked(useDeletePolicy).mockReturnValue(mut({ mutate: deleteMutate }));
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    renderPage();
+    // Open source panel first
+    fireEvent.click(screen.getByRole('button', { name: /view source/i }));
+    expect(screen.getByText(/package purser/i)).toBeInTheDocument();
+    // Delete the policy
+    fireEvent.click(screen.getByRole('button', { name: /^delete$/i }));
+    // Source panel should be closed
+    expect(screen.queryByText(/package purser/i)).not.toBeInTheDocument();
+    vi.restoreAllMocks();
+  });
+});
+
+describe('PoliciesPage — upload modal submit', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAll([]);
+  });
+
+  it('calls upsertPolicy with name and rego source on submit', async () => {
+    const upsertMutate = vi.fn();
+    vi.mocked(useUpsertPolicy).mockReturnValue(mut({ mutate: upsertMutate }));
+    vi.mocked(useDeletePolicy).mockReturnValue(mut());
+
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: /upload policy/i }));
+    const nameInput = screen.getByRole('textbox', { name: /policy name/i });
+    fireEvent.change(nameInput, { target: { value: 'my-new-policy' } });
+    fireEvent.click(screen.getByRole('button', { name: /^upload$/i }));
+
+    expect(upsertMutate).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'my-new-policy' }),
+      expect.any(Object),
+    );
+  });
+
+  it('shows non-license upsert error inside the modal', async () => {
+    vi.mocked(useUpsertPolicy).mockReturnValue(
+      mut({ isError: true, error: new Error('server error: upload failed') }),
+    );
+
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: /upload policy/i }));
+
+    // The error paragraph renders when isError and NOT a license error
+    expect(screen.getByText('server error: upload failed')).toBeInTheDocument();
+  });
+});
+
 describe('PoliciesPage — enterprise gate', () => {
   it('shows enterprise upgrade card when license_required error', () => {
     vi.clearAllMocks();

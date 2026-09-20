@@ -1,0 +1,115 @@
+# -----------------------------------------------------------------------------
+# Example Helm values for running the full Purser platform on a local k3s
+# cluster — CPU-only (mock engine), single node, with the built-in local admin
+# login enabled so you sign in for real (not demo/fail-open mode).
+#
+# This file is an OVERLAY for the chart at deploy/helm/purser. It does not
+# redefine any Kubernetes object — it only sets values. Bring it up/down by hand:
+#
+#   helm install purser ../../deploy/helm/purser -n purser --create-namespace \
+#     -f values-k3s.yaml
+#   helm uninstall purser -n purser
+#
+# See README.md in this directory for the full step-by-step (k3s install,
+# building + importing the images, DNS, and how to log in).
+# -----------------------------------------------------------------------------
+
+# Single node: SQLite is single-writer, so exactly one control-plane replica.
+replicaCount: 1
+
+image:
+  # Use images built locally and imported into k3s containerd (see README):
+  #   sudo docker build ... -t purser-control-plane:v0.7-local .
+  #   sudo docker save purser-control-plane:v0.7-local | sudo k3s ctr images import -
+  # pullPolicy: Never guarantees k3s uses the imported image and never tries to
+  # pull from a registry (the v0.7 images with local-admin login are not
+  # published to GHCR yet — see README for the GHCR variant once v0.7 ships).
+  pullPolicy: Never
+  controlPlane:
+    repository: purser-control-plane
+    tag: v0.7-local
+  gateway:
+    repository: purser-gateway
+    tag: v0.7-local
+  ui:
+    repository: purser-ui
+    tag: v0.7-local
+
+# CPU-only: mock engine, no GPU, no external Agent required. The umbrella chart
+# does not deploy an Agent (Agents run outside k8s), so this value is mostly
+# documentation here — real inference needs an Agent, but the platform, UI, and
+# login all work end-to-end without one.
+agent:
+  engineBackend: mock
+
+controlPlane:
+  httpPort: 8080
+  grpcPort: 9443
+  clusterId: "k3s-local"
+  persistence:
+    enabled: true
+    size: 2Gi
+    # k3s ships the local-path provisioner as the default StorageClass.
+    storageClass: ""
+    mountPath: /data
+  # Extra env appended verbatim to the control-plane container.
+  #
+  # PURSER_ADMIN_PASSWORD is the master key: setting it enables the built-in
+  # local admin account (POST /auth/local-login) AND closes the demo/fail-open
+  # hole (anonymous /api/v1/* → 401). CHANGE THIS before exposing the cluster to
+  # anything but your laptop.
+  #
+  # PURSER_SESSION_SECRET must be exactly 64 hex chars (32 bytes) so sessions
+  # survive a control-plane restart. Generate one with: openssl rand -hex 32
+  # (the value below is a throwaway example — regenerate your own).
+  extraEnv:
+    - name: PURSER_ADMIN_USERNAME
+      value: "admin"
+    - name: PURSER_ADMIN_PASSWORD
+      value: "change-me-please-a-long-secret"
+    - name: PURSER_SESSION_SECRET
+      value: "0000000000000000000000000000000000000000000000000000000000000000"
+
+gateway:
+  port: 8080
+  # Shared control-plane ↔ gateway route-sync token. Empty => the chart
+  # generates a random one at install and reuses it on upgrade.
+  internalToken: ""
+  # Empty => no API keys configured. The gateway refuses to start with neither
+  # API keys nor dev mode, so we enable dev mode below for this local playground.
+  apiKeys: ""
+  # PURSER_GATEWAY_DEV_MODE=1: accept any non-empty bearer token (local demo
+  # only). Set real PURSER_GATEWAY_API_KEYS (via gateway.apiKeys) before exposing
+  # the gateway to anything but your laptop.
+  extraEnv:
+    - name: PURSER_GATEWAY_DEV_MODE
+      value: "1"
+
+ui:
+  # MUST be 8080 — the nginx image listens on 8080 and runs non-root (cannot bind
+  # 80). Same-origin API/gateway bases work because of the ingress below.
+  port: 8080
+  apiBaseUrl: "/api/v1"
+  gatewayBaseUrl: "/v1"
+  # PURSER_UI_LOCAL_AUTH=1 makes the UI render the username/password login form
+  # and leave dev-mode. It must agree with PURSER_ADMIN_PASSWORD on the control
+  # plane above — one enforces auth server-side, the other shows the form.
+  extraEnv:
+    - name: PURSER_UI_LOCAL_AUTH
+      value: "1"
+
+# Single-origin routing via the k3s built-in Traefik ingress controller:
+#   /api → control-plane, /v1 → gateway, / → ui
+# purser.localtest.me (and *.localtest.me) resolve to 127.0.0.1 with no
+# /etc/hosts edit, so this Just Works against a local k3s on your machine.
+ingress:
+  enabled: true
+  className: "traefik"
+  host: "purser.localtest.me"
+  annotations: {}
+  tls: []
+
+# SQLite on the PVC — simplest single-node backend. Use postgres for HA.
+database:
+  driver: sqlite
+  sqlitePath: /data/purser-registry.db

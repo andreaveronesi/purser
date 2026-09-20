@@ -33,6 +33,7 @@ function FitBadge({ entry, t }: { entry: CatalogEntry; t: TFunc }) {
   if (fit.fits && fit.estimated) {
     const tone = fit.reasonKey === 'fits_tight' ? 'warning' : 'success';
     const tokrange = range(fit.estimated.decodeTokSMin, fit.estimated.decodeTokSMax, 'tok/s');
+    const isMock = entry.model.engine === 'mock';
     return (
       <div className={`fit fit--${tone}`}>
         <span className="fit__icon" aria-hidden="true">
@@ -48,6 +49,15 @@ function FitBadge({ entry, t }: { entry: CatalogEntry; t: TFunc }) {
               quant: fit.quantization ?? '',
               tokrange,
             })}
+            {isMock && (
+              <span
+                className="muted"
+                data-testid="mock-disclaimer"
+                style={{ marginLeft: '0.4em', fontSize: '0.9em' }}
+              >
+                {t('catalog.mock.disclaimer')}
+              </span>
+            )}
           </p>
         </div>
       </div>

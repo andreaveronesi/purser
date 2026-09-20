@@ -132,14 +132,25 @@ type NodeMetrics struct {
 
 // LiveMetrics is a concurrency-safe cache of the latest per-node metrics,
 // populated by the Heartbeat handler and read by the SSE metrics endpoint.
+// Samples older than maxAge are treated as absent by Get so that silent nodes
+// (still enrolled but no longer sending heartbeats) are zero-filled rather
+// than showing stale throughput values.
 type LiveMetrics struct {
-	mu   sync.RWMutex
-	byID map[string]NodeMetrics
+	mu     sync.RWMutex
+	byID   map[string]NodeMetrics
+	clock  func() time.Time
+	maxAge time.Duration
 }
 
-// NewLiveMetrics builds an empty cache.
+// NewLiveMetrics builds an empty cache with a default staleness TTL of 30 s.
 func NewLiveMetrics() *LiveMetrics {
-	return &LiveMetrics{byID: map[string]NodeMetrics{}}
+	return NewLiveMetricsWithClock(30*time.Second, time.Now)
+}
+
+// NewLiveMetricsWithClock builds a LiveMetrics with a custom staleness TTL
+// and clock function. Intended for tests that need deterministic time control.
+func NewLiveMetricsWithClock(maxAge time.Duration, clock func() time.Time) *LiveMetrics {
+	return &LiveMetrics{byID: map[string]NodeMetrics{}, clock: clock, maxAge: maxAge}
 }
 
 // Update records the latest sample for a node. em carries the engine-level
@@ -170,12 +181,21 @@ func (l *LiveMetrics) Update(nodeID, state string, em *purserv1.EngineMetrics, h
 }
 
 // Get returns the latest metrics sample for nodeID. ok is false when the node
-// has not yet sent a heartbeat.
+// has not yet sent a heartbeat or when the most recent sample is older than
+// the cache TTL (maxAge). Callers should zero-fill the node when ok is false.
 func (l *LiveMetrics) Get(nodeID string) (NodeMetrics, bool) {
 	l.mu.RLock()
 	defer l.mu.RUnlock()
 	m, ok := l.byID[nodeID]
-	return m, ok
+	if !ok {
+		return NodeMetrics{}, false
+	}
+	// Treat samples older than maxAge as absent so that enrolled but silent
+	// nodes are not reported with stale throughput values.
+	if l.maxAge > 0 && !m.UpdatedAt.After(l.clock().Add(-l.maxAge)) {
+		return NodeMetrics{}, false
+	}
+	return m, true
 }
 
 // Snapshot returns the current per-node metrics in the SSE wire format. It

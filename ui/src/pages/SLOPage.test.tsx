@@ -221,3 +221,132 @@ describe('SLOPage — enterprise gate', () => {
     expect(screen.getByRole('alert')).toBeInTheDocument();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Loading state
+// ---------------------------------------------------------------------------
+
+describe('SLOPage — loading state', () => {
+  it('shows LoadingBlock while data is loading', () => {
+    vi.clearAllMocks();
+    vi.mocked(useSloComplianceFull).mockReturnValue(qr({ isLoading: true }));
+    renderPage();
+    expect(screen.getByRole('status')).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ComplianceRow — colour branches for breached/met/insufficient_data
+// ---------------------------------------------------------------------------
+
+describe('SLOPage — compliance colour branches', () => {
+  it('breached model with ttft_compliance shows danger colour (line 197)', () => {
+    const response = {
+      window_hours: 24,
+      generated_at: '2026-09-12T00:00:00Z',
+      models: [
+        {
+          model_id: 'qwen3',
+          slo: { ttft_ms: 1500, tbt_ms: 400, target_compliance: 0.95 },
+          actual: { ttft_compliance: 0.72, tbt_compliance: null, request_count: 100, period_start: '2026-09-11T00:00:00Z' },
+          status: 'breached' as const,
+        },
+      ],
+    };
+    vi.clearAllMocks();
+    vi.mocked(useSloComplianceFull).mockReturnValue(qr({ data: response }));
+    renderPage();
+    // 0.72 * 100 = 72.0%
+    expect(screen.getByText('72.0%')).toBeInTheDocument();
+    // Colour is applied via inline style: 'var(--color-danger)' for breached
+    const span = screen.getByText('72.0%');
+    expect(span.style.color).toContain('danger');
+  });
+
+  it('met model with ttft_compliance shows success colour (line 197)', () => {
+    const response = {
+      window_hours: 24,
+      generated_at: '2026-09-12T00:00:00Z',
+      models: [
+        {
+          model_id: 'llama3',
+          slo: { ttft_ms: 2000, tbt_ms: 500, target_compliance: 0.95 },
+          actual: { ttft_compliance: 0.99, tbt_compliance: null, request_count: 500, period_start: '2026-09-11T00:00:00Z' },
+          status: 'met' as const,
+        },
+      ],
+    };
+    vi.clearAllMocks();
+    vi.mocked(useSloComplianceFull).mockReturnValue(qr({ data: response }));
+    renderPage();
+    // 0.99 * 100 = 99.0%
+    expect(screen.getByText('99.0%')).toBeInTheDocument();
+    const span = screen.getByText('99.0%');
+    expect(span.style.color).toContain('success');
+  });
+
+  it('insufficient_data model with ttft_compliance shows neutral text colour (line 197 third branch)', () => {
+    const response = {
+      window_hours: 24,
+      generated_at: '2026-09-12T00:00:00Z',
+      models: [
+        {
+          model_id: 'mixtral',
+          slo: { ttft_ms: 2000, tbt_ms: 500, target_compliance: 0.95 },
+          actual: { ttft_compliance: 0.50, tbt_compliance: null, request_count: 3, period_start: '2026-09-11T00:00:00Z' },
+          status: 'insufficient_data' as const,
+        },
+      ],
+    };
+    vi.clearAllMocks();
+    vi.mocked(useSloComplianceFull).mockReturnValue(qr({ data: response }));
+    renderPage();
+    // 0.50 * 100 = 50.0%
+    expect(screen.getByText('50.0%')).toBeInTheDocument();
+    // status is insufficient_data so neither danger nor success: color = 'var(--color-text)'
+    const span = screen.getByText('50.0%');
+    expect(span.style.color).not.toContain('danger');
+    expect(span.style.color).not.toContain('success');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// isLicenseRequired — body/error-field edge cases (lines 220-222)
+// ---------------------------------------------------------------------------
+
+describe('SLOPage — isLicenseRequired edge cases', () => {
+  it('shows generic error when ApiError body is null (not license_required)', () => {
+    vi.clearAllMocks();
+    vi.mocked(useSloComplianceFull).mockReturnValue(
+      qr({ isError: true, error: new ApiError(402, 'empty body', null) }),
+    );
+    renderPage();
+    // null body → isLicenseRequired returns false → generic error
+    expect(screen.queryByText('Enterprise feature')).not.toBeInTheDocument();
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+  });
+
+  it('shows generic error when error field is not an object', () => {
+    vi.clearAllMocks();
+    vi.mocked(useSloComplianceFull).mockReturnValue(
+      qr({ isError: true, error: new ApiError(402, 'wrong shape', { error: 'string' }) }),
+    );
+    renderPage();
+    // error field is a string, not an object → isLicenseRequired returns false
+    expect(screen.queryByText('Enterprise feature')).not.toBeInTheDocument();
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+  });
+
+  it('shows retry button for generic SLO error', () => {
+    vi.clearAllMocks();
+    const refetch = vi.fn();
+    vi.mocked(useSloComplianceFull).mockReturnValue(
+      qr({ isError: true, error: new Error('server error'), refetch }),
+    );
+    renderPage();
+    const retryBtn = screen.getByRole('button', { name: /retry/i });
+    expect(retryBtn).toBeInTheDocument();
+    fireEvent.click(retryBtn);
+    expect(refetch).toHaveBeenCalled();
+  });
+});

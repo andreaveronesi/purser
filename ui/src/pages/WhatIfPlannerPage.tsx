@@ -109,22 +109,61 @@ function VirtualNodeRow({ index, node, onChange, onRemove, t }: VirtualNodeRowPr
 // ---------------------------------------------------------------------------
 
 function ResultPanel({ result, t }: { result: WhatIfResult; t: ReturnType<typeof useT> }) {
-  const feasibleTone: Tone = result.feasible ? 'success' : 'danger';
+  const simulatedTone: Tone = result.feasible ? 'success' : 'danger';
+  const currentTone: Tone | undefined =
+    result.currentPlan !== undefined
+      ? result.currentPlan.feasible
+        ? 'success'
+        : 'danger'
+      : undefined;
+
+  // When virtual nodes are added but the simulated plan is still infeasible while
+  // the current fleet is already feasible — make that contrast explicit.
+  const showNoImprovement =
+    result.feasible === false && result.currentPlan?.feasible === true;
 
   return (
     <Card title="Simulation result">
-      <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginBottom: '1rem' }}>
-        <Badge tone={feasibleTone} data-testid="whatif-feasible-badge">
-          {result.feasible ? t('planner.whatIf.result.feasible') : t('planner.whatIf.result.infeasible')}
-        </Badge>
-        {result.current_plan !== undefined && (
-          <span className="muted">
-            {t('planner.whatIf.result.currentPlan', {
-              status: result.current_plan.feasible
-                ? t('planner.whatIf.result.feasible')
-                : t('planner.whatIf.result.infeasible'),
-            })}
+      {/* Comparative block — two clearly-labelled scenario rows */}
+      <div
+        style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '1rem' }}
+      >
+        {/* Row 1: result WITH virtual nodes */}
+        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+          <span className="muted" style={{ minWidth: '13rem' }}>
+            {t('planner.whatIf.result.withSimulated')}
           </span>
+          {/* Wrapper span carries the testid because Badge doesn't accept arbitrary props */}
+          <span data-testid="whatif-simulated-badge">
+            <Badge tone={simulatedTone}>
+              {result.feasible
+                ? t('planner.whatIf.result.feasible')
+                : t('planner.whatIf.result.infeasible')}
+            </Badge>
+          </span>
+        </div>
+
+        {/* Row 2: current fleet WITHOUT virtual nodes (only when backend returns it) */}
+        {result.currentPlan !== undefined && (
+          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+            <span className="muted" style={{ minWidth: '13rem' }}>
+              {t('planner.whatIf.result.currentFleet')}
+            </span>
+            <span data-testid="whatif-current-badge">
+              <Badge tone={currentTone!}>
+                {result.currentPlan.feasible
+                  ? t('planner.whatIf.result.feasible')
+                  : t('planner.whatIf.result.infeasible')}
+              </Badge>
+            </span>
+          </div>
+        )}
+
+        {/* Explanatory note: virtual nodes didn't help vs the already-feasible fleet */}
+        {showNoImprovement && (
+          <p className="muted" style={{ marginTop: '0.25rem', marginBottom: 0 }}>
+            {t('planner.whatIf.result.noImprovement')}
+          </p>
         )}
       </div>
 
@@ -134,20 +173,20 @@ function ResultPanel({ result, t }: { result: WhatIfResult; t: ReturnType<typeof
 
       {result.feasible && (
         <>
-          {result.estimated_decode_tok_s_min !== undefined && result.estimated_decode_tok_s_max !== undefined && (
+          {result.estimatedDecodeTokSMin != null && result.estimatedDecodeTokSMax != null && (
             <p className="stat__value" style={{ marginBottom: '0.5rem' }}>
               {t('planner.whatIf.result.throughput', {
-                min: result.estimated_decode_tok_s_min.toFixed(0),
-                max: result.estimated_decode_tok_s_max.toFixed(0),
+                min: result.estimatedDecodeTokSMin.toFixed(0),
+                max: result.estimatedDecodeTokSMax.toFixed(0),
               })}
             </p>
           )}
 
-          {result.improvement_delta !== undefined && result.improvement_delta > 0 && (
+          {result.improvementDelta != null && result.improvementDelta > 0 && (
             <p style={{ marginBottom: '0.75rem' }}>
               <Badge tone="success">
                 {t('planner.whatIf.result.delta', {
-                  delta: (result.improvement_delta * 100).toFixed(0),
+                  delta: (result.improvementDelta * 100).toFixed(0),
                 })}
               </Badge>
             </p>
@@ -167,10 +206,10 @@ function ResultPanel({ result, t }: { result: WhatIfResult; t: ReturnType<typeof
                   </thead>
                   <tbody>
                     {result.assignments.map((a) => (
-                      <tr key={a.node_id}>
-                        <td><code>{a.node_id}</code></td>
-                        <td>{a.layer_start}</td>
-                        <td>{a.layer_end}</td>
+                      <tr key={a.nodeId}>
+                        <td><code>{a.nodeId}</code></td>
+                        <td>{a.layerStart}</td>
+                        <td>{a.layerEnd}</td>
                       </tr>
                     ))}
                   </tbody>

@@ -30,14 +30,11 @@ import (
 // ---------------------------------------------------------------------------
 
 // handleListUsers returns a summary of all platform users, derived from the
-// org_members table. Requires admin role.
+// org_members table.
+// Auth: platform:users:invite enforced by routePermission in rbacMiddleware (Wave 3).
 //
 // GET /api/v1/platform/users
 func (s *Server) handleListUsers(w http.ResponseWriter, r *http.Request) {
-	if !s.isAdminActor(r) {
-		s.writeError(w, http.StatusForbidden, "forbidden", "platform_admin role required")
-		return
-	}
 	if s.reg == nil {
 		s.writeJSON(w, http.StatusOK, map[string]any{"users": []any{}})
 		return
@@ -68,13 +65,29 @@ func (s *Server) handleListUsers(w http.ResponseWriter, r *http.Request) {
 	s.writeJSON(w, http.StatusOK, map[string]any{"users": users})
 }
 
-// handleGetMe returns the current actor's identity along with their org and
-// team memberships. This is the "who am I?" endpoint that every client should
-// call at login.
+// handleGetMe returns the current caller's identity: actor string, email,
+// effective role, platform/org admin flags, and org+team memberships.
+// The UI AuthContext uses this endpoint as its source of truth at login.
 //
 // GET /api/v1/platform/users/me
 func (s *Server) handleGetMe(w http.ResponseWriter, r *http.Request) {
 	actor := actorFromRequest(r)
+
+	// Extract OIDC identity claims injected by oidcMiddleware. These are present
+	// for both session-cookie (browser SSO) and Bearer token (machine) paths.
+	email, _ := r.Context().Value(ctxKeyOIDCEmail).(string)
+	role, _ := r.Context().Value(ctxKeyOIDCRole).(string)
+
+	// Fallback: if no OIDC role, check for an API key role so that machine callers
+	// that use API keys also get a sensible role in /me.
+	if role == "" {
+		if key := apiKeyFromContext(r.Context()); key != nil {
+			role = key.Role
+		}
+	}
+
+	// is_platform_admin: true when the caller has "admin" credentials of any kind.
+	isPlatformAdmin := s.isAdminActor(r)
 
 	var orgMemberships []*registry.OrgMember
 	var teamMemberships []*registry.TeamMember
@@ -94,14 +107,25 @@ func (s *Server) handleGetMe(w http.ResponseWriter, r *http.Request) {
 		teamMemberships = []*registry.TeamMember{}
 	}
 
-	// Note: full user profile (name, email, avatar) requires OIDC/LDAP
-	// integration (Wave 3). For now we expose what we know: the stable
-	// actor string derived from the auth credential and the membership lists.
+	// is_org_admin: true when the caller has the "org_admin" role in any org.
+	isOrgAdmin := false
+	for _, m := range orgMemberships {
+		if m.Role == "org_admin" {
+			isOrgAdmin = true
+			break
+		}
+	}
+
 	s.writeJSON(w, http.StatusOK, map[string]any{
-		"actor":                 actor,
-		"orgs":                  orgMemberships,
-		"teams":                 teamMemberships,
-		"note":                  "full user profile requires OIDC/LDAP integration (Wave 3)",
+		"actor":             actor,
+		"email":             email,
+		"role":              role,
+		"is_platform_admin": isPlatformAdmin,
+		"is_org_admin":      isOrgAdmin,
+		"orgs":              orgMemberships,
+		"teams":             teamMemberships,
+		// service_accounts are team-level credentials for machine-to-machine auth
+		// (LiteLLM, CI/CD). Managed via POST /api/v1/platform/teams/{id}/service-accounts.
 		"service_accounts_note": "service_accounts are team-level credentials for machine-to-machine auth (LiteLLM, CI/CD)",
 	})
 }
@@ -147,15 +171,11 @@ func (s *Server) handleGetUser(w http.ResponseWriter, r *http.Request) {
 // ---------------------------------------------------------------------------
 
 // handleCreateRole creates a new custom role within an org.
-// Requires org_admin or platform admin role.
+// Auth: org:roles:create enforced by routePermission in rbacMiddleware (Wave 3).
 //
 // POST /api/v1/platform/orgs/{orgId}/roles
 func (s *Server) handleCreateRole(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("orgId")
-	if !s.isAdminActor(r) {
-		s.writeError(w, http.StatusForbidden, "forbidden", "org_admin or platform_admin role required")
-		return
-	}
 	if s.reg == nil {
 		s.writeError(w, http.StatusInternalServerError, "no_registry", "registry not configured")
 		return
@@ -256,15 +276,12 @@ func (s *Server) handleGetRole(w http.ResponseWriter, r *http.Request) {
 
 // handleUpdateRole replaces the mutable fields of a custom role. System roles
 // (is_system=true) cannot be modified.
+// Auth: org:roles:create enforced by routePermission in rbacMiddleware (Wave 3).
 //
 // PUT /api/v1/platform/orgs/{orgId}/roles/{id}
 func (s *Server) handleUpdateRole(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("orgId")
 	roleID := r.PathValue("id")
-	if !s.isAdminActor(r) {
-		s.writeError(w, http.StatusForbidden, "forbidden", "org_admin or platform_admin role required")
-		return
-	}
 	if s.reg == nil {
 		s.writeError(w, http.StatusInternalServerError, "no_registry", "registry not configured")
 		return
@@ -332,15 +349,12 @@ func (s *Server) handleUpdateRole(w http.ResponseWriter, r *http.Request) {
 
 // handleDeleteRole removes a custom role. Returns 409 when the role is a
 // system role or is currently assigned to at least one team member.
+// Auth: org:roles:delete enforced by routePermission in rbacMiddleware (Wave 3).
 //
 // DELETE /api/v1/platform/orgs/{orgId}/roles/{id}
 func (s *Server) handleDeleteRole(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("orgId")
 	roleID := r.PathValue("id")
-	if !s.isAdminActor(r) {
-		s.writeError(w, http.StatusForbidden, "forbidden", "org_admin or platform_admin role required")
-		return
-	}
 	if s.reg == nil {
 		s.writeError(w, http.StatusInternalServerError, "no_registry", "registry not configured")
 		return
@@ -488,7 +502,14 @@ func (s *Server) isAdminActor(r *http.Request) bool {
 	}
 	has, err := s.reg.HasAnyAPIKey(r.Context())
 	if err != nil || !has {
-		// No keys in system → dev mode, allow everything.
+		// No keys in system. In pure dev mode (nothing configured) allow
+		// everything. But when the local admin account is configured the demo
+		// fail-open is closed: an unauthenticated caller is NOT an admin — only a
+		// valid local session cookie (which injects ctxKeyOIDCRole="admin" above)
+		// grants admin.
+		if s.localAuthEnabled() {
+			return false
+		}
 		return true
 	}
 	return false

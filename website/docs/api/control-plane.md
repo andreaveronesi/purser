@@ -624,7 +624,8 @@ This legacy URL will be removed in v0.6.
 
 ### `GET /api/v1/cluster/health`
 
-Reports a coarse cluster health summary (DB reachability + node counts).
+Reports a coarse cluster health summary (DB reachability + node counts + capacity
+aggregates).
 
 **Response `200`:**
 
@@ -633,7 +634,9 @@ Reports a coarse cluster health summary (DB reachability + node counts).
   "status": "ok",
   "total_nodes": 3,
   "ready_nodes": 3,
-  "checked_at": "2026-09-05T00:00:00Z"
+  "checked_at": "2026-09-05T00:00:00Z",
+  "ram_total_gb": 46.11,
+  "vram_total_gb": 0
 }
 ```
 
@@ -642,6 +645,17 @@ Reports a coarse cluster health summary (DB reachability + node counts).
 - `"degraded"` — nodes exist but none is ready
 - `"empty"` — no nodes enrolled
 - `"unavailable"` — database is unreachable (response is `503`)
+
+**Capacity fields (v0.7+):**
+
+| Field | Description |
+|---|---|
+| `ram_total_gb` | Sum of system RAM (GB) across all `READY`/`RUNNING` nodes, from the hardware profile reported at enrollment. Decommissioned nodes are excluded. |
+| `vram_total_gb` | Sum of GPU VRAM (GB) across all `READY`/`RUNNING` nodes. **`0` is a real, measured value** on CPU-only clusters — it is not an indicator of missing data. |
+
+The Operator Dashboard Fleet page reads these fields to populate the RAM/VRAM
+capacity meters.  When a backend predating v0.7 is used these fields are absent
+and the UI shows "—" instead of a meter.
 
 ---
 
@@ -968,8 +982,23 @@ Query parameters:
 
 ### `GET /api/v1/openapi.json`
 
-Serves the embedded OpenAPI 3.0 specification as JSON. The spec is compiled from
-`go/controlplane/server/openapi.json` (generated from `openapi.yaml`).
+Serves the embedded OpenAPI 3.0 specification as JSON. The spec is **generated**
+from the control plane's declarative route table
+(`go/controlplane/server/openapi_registry.go`) merged with curated schema
+enrichment (`openapi.base.json`), so the published contract can never drift from
+the routes the server actually serves: **every** registered, non-exempt endpoint
+appears in the document by construction. Internal-only routes (auth flows,
+gateway→CP ingest, liveness probes, the spec endpoint itself) are deliberately
+excluded.
+
+Operations that have not yet been given a hand-authored request/response schema
+are emitted with a generic body and an `x-purser-todo` marker — the endpoint is
+real and served, only its body shape is undocumented. To flesh one out, add an
+entry to `openapi.base.json` and regenerate.
+
+Regenerate after any route change with `go generate ./server/...` from
+`go/controlplane`; a test fails the build if the committed `openapi.json` is
+stale. Do not hand-edit `openapi.json`.
 
 - **Postman**: File → Import → Link, paste `http://<host>/api/v1/openapi.json`
 - **Swagger UI / Redoc**: Point the UI at `http://<host>/api/v1/openapi.json`

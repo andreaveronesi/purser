@@ -48,8 +48,8 @@ As of v0.3, Purser implements the **OAuth 2.0 Authorization Code Flow with PKCE*
 1. Browser hits a protected page → oidcMiddleware detects no valid session → redirects to `GET /auth/login`.
 2. `GET /auth/login` generates a cryptographic `state` (32 random bytes, hex) and PKCE `code_verifier` (32 random bytes, base64url), computes `code_challenge = base64url(SHA256(verifier))`, stores `state→verifier` for 10 minutes, and redirects the browser to the IdP.
 3. User authenticates at the IdP; IdP redirects to `GET /auth/callback?code=…&state=…`.
-4. `GET /auth/callback` validates the `state`, exchanges the code for tokens at the IdP's token endpoint (attaching `code_verifier`), verifies the returned ID token, and sets an HttpOnly session cookie (`purser_session`, 8h TTL, HMAC-SHA256 signed).
-5. Browser is redirected to `/`. Subsequent API and UI requests are authenticated via the session cookie.
+4. `GET /auth/callback` validates the `state`, exchanges the code for tokens at the IdP's token endpoint (attaching `code_verifier`), verifies the ID token (extracting group/role claims when `PURSER_OIDC_GROUP_MAPPINGS` is configured), and sets an HttpOnly session cookie (`purser_session`, 8h TTL, HMAC-SHA256 signed). The resolved Purser role (`admin`, `viewer`, or `inference`) is persisted in the `oidc_sessions` DB row — the signed cookie itself contains only sub + email, never the role.
+5. Browser is redirected to `/`. Subsequent API and UI requests are authenticated via the session cookie. `oidcMiddleware` reads the role from the DB row on each request and injects it into the request context so `rbacMiddleware` can enforce it without a per-request IdP call.
 
 ### Session cookie properties
 
@@ -76,6 +76,45 @@ Every session created via `/auth/callback` is persisted in the SQLite registry
 
 The control plane runs an hourly background job to delete expired sessions and
 stale PKCE state rows so the tables stay bounded.
+
+!!! note "Role staleness"
+    The resolved role is saved in the DB at login time and re-read on every
+    request. If an administrator changes a user's group membership in the IdP,
+    the change takes effect at the user's **next login** (the session must be
+    revoked or expire for the new role to be picked up). To force an immediate
+    role refresh, revoke the user's active session via `GET /auth/logout` or the
+    admin revoke API.
+
+---
+
+## Identity endpoint: GET /api/v1/platform/users/me
+
+The `/me` endpoint returns the current caller's full identity. The UI
+**AuthContext** calls this at login to populate the user profile and permission
+state. It is accessible to any authenticated request (session cookie, Bearer
+token, or API key).
+
+```json
+{
+  "actor":             "oidc:alice@example.com",
+  "email":             "alice@example.com",
+  "role":              "admin",
+  "is_platform_admin": true,
+  "is_org_admin":      false,
+  "orgs":              [...],
+  "teams":             [...]
+}
+```
+
+| Field | Description |
+|---|---|
+| `actor` | Stable identity string derived from the credential: `oidc:<sub>` for OIDC/LDAP sessions, `apikey:<hash>` for API keys. |
+| `email` | Email address from the OIDC/LDAP session. Empty for API-key callers. |
+| `role` | Effective Purser role: `admin`, `viewer`, `inference`, or `""` (unauthenticated/dev). For API-key callers this is the key's role. |
+| `is_platform_admin` | `true` when `role == "admin"` (or no auth is configured). |
+| `is_org_admin` | `true` when the caller has `org_admin` role in at least one organization. |
+| `orgs` | List of `OrgMember` objects (org_id, role, joined_at). |
+| `teams` | List of `TeamMember` objects (team_id, role_id, joined_at). |
 
 ---
 

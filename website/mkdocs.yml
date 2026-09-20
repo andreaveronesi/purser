@@ -98,6 +98,10 @@ nav:
     - Node Pools: configuration/node-pools.md
     - Platform UI (Orgs, Teams & Pools): configuration/platform-ui.md
     - Multi-Replica Deployments: configuration/multi-replica.md
+  - Authentication:
+    - Getting Started: auth/getting-started.md
+    - Local Admin Login (Master Key): auth/local-admin.md
+    - UI Navigation & Action Gating (RBAC): auth/rbac-ui.md
   - Enterprise:
     - Open-Core Model: enterprise/overview.md
     - Licensing & Key Management: enterprise/licensing.md
@@ -123,6 +127,7 @@ nav:
     - Python SDK: integrations/python-sdk.md
     - TypeScript SDK: integrations/typescript-sdk.md
   - Operations:
+    - Fleet Management: operations/fleet.md
     - Observability (Prometheus / OpenTelemetry): operations/observability.md
     - Grafana Dashboards: operations/grafana.md
     - Database Configuration: operations/database.md
@@ -143,4 +148,6 @@ nav:
     - Anthropic Compatibility (/v1/messages): api/anthropic-compatibility.md
   - Development:
     - Benchmarking the Planner: development/benchmarking.md
+    - Testing Architecture: development/testing.md
+    - Frontend Tokens and Layout: development/frontend.md
   - Changelog: changelog.md

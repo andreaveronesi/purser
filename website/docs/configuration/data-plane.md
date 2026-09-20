@@ -57,6 +57,11 @@ the CP can mark a DP `degraded` or `offline` when it goes silent.
 
 ### Node assignment
 
+**Nodes are not a prerequisite for creating a Data Plane.** Fleet nodes exist
+independently and can be assigned to a Data Plane at any time after creation — the
+Data Planes page will show empty until you register at least one DP, regardless of
+how many nodes are in your fleet.
+
 Every fleet node can be assigned to exactly one Data Plane. Nodes with no assignment
 belong to the default (unpartitioned) pool and are available for deployments that
 do not specify a DP. Assignment is changed at any time via the REST API.
@@ -285,6 +290,24 @@ curl -X DELETE https://cp.example.com/api/v1/platform/dataplanes/dp-a1b2c3d4e5f6
 | `POST` | `/api/v1/platform/dataplanes/{id}/nodes/{nodeId}` | admin | Assign node to DP |
 | `DELETE` | `/api/v1/platform/dataplanes/{id}/nodes/{nodeId}` | admin | Unassign node |
 | `GET` | `/api/v1/platform/dataplanes/{id}/nodes` | admin | List nodes in DP |
+
+---
+
+## Data Planes page (UI)
+
+The **Data Planes** page in the operator dashboard lists every registered DP. Click
+a row to expand its detail panel, which now exposes the full lifecycle:
+
+- **Edit** opens a modal to change the name, tier, gateway URL, or description
+  (`PUT /platform/dataplanes/{id}`).
+- **Delete** uses an arm→confirm interaction — the first click arms the button (it
+  turns red and reads *Delete {name}?*), the second confirms
+  (`DELETE /platform/dataplanes/{id}`). A hint reminds the operator that assigned
+  nodes are released.
+- **Assigned nodes** lists the DP's nodes (`GET …/{id}/nodes`); an input assigns a
+  node by id (`POST …/{id}/nodes/{nodeId}`) and each node chip has an arm→confirm
+  unassign action (`DELETE …/{id}/nodes/{nodeId}`).
+- **Refresh config** (existing) triggers an immediate snapshot rebuild.
 
 ---
 

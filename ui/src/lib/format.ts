@@ -59,6 +59,20 @@ export function clamp(value: number, lo: number, hi: number): number {
 }
 
 /**
+ * Whole number with thousands grouping: 8400 → "8,400".
+ *
+ * The locale is pinned, which is the entire point. `n.toLocaleString()` and
+ * `new Intl.NumberFormat().format(n)` read the HOST machine's locale, so the
+ * identical build renders "8,400" for one operator and "8400" for another, and
+ * any test asserting the output passes or fails depending on whose machine runs
+ * it. Grouping stays fixed here so the dashboard reads the same everywhere —
+ * the locale-neutral contract this module opens with.
+ */
+export function integer(value: number): string {
+  return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(value);
+}
+
+/**
  * Format a token count compactly: 0–999 as-is, 1000+ as "1.2K", 1M+ as "1.2M".
  * Used for token usage cells in the Settings page.
  */

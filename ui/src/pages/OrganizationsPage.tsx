@@ -23,6 +23,7 @@ import {
   useDeleteOrganization,
 } from '../hooks/queries';
 import { useT } from '../i18n';
+import { useCanAdmin } from '../lib/auth';
 import { errorMessage } from '../lib/errors';
 import type { Organization } from '../api/types';
 
@@ -129,6 +130,7 @@ interface OrgRowProps {
 function OrgRow({ org }: OrgRowProps) {
   const t = useT();
   const navigate = useNavigate();
+  const canAdmin = useCanAdmin();
   const deleteOrg = useDeleteOrganization();
   const [confirming, setConfirming] = useState(false);
 
@@ -166,20 +168,24 @@ function OrgRow({ org }: OrgRowProps) {
           >
             {t('platform.orgs.viewTeams')}
           </Button>
-          <Button
-            variant={confirming ? 'danger' : 'ghost'}
-            size="sm"
-            onClick={handleDelete}
-            disabled={deleteOrg.isPending}
-            aria-label={t('platform.orgs.delete')}
-          >
-            <IconTrash />
-            {confirming ? t('platform.orgs.deleteConfirm', { name: org.name }) : t('platform.orgs.delete')}
-          </Button>
-          {confirming && (
-            <Button variant="secondary" size="sm" onClick={() => setConfirming(false)}>
-              {t('action.cancel')}
-            </Button>
+          {canAdmin && (
+            <>
+              <Button
+                variant={confirming ? 'danger' : 'ghost'}
+                size="sm"
+                onClick={handleDelete}
+                disabled={deleteOrg.isPending}
+                aria-label={t('platform.orgs.delete')}
+              >
+                <IconTrash />
+                {confirming ? t('platform.orgs.deleteConfirm', { name: org.name }) : t('platform.orgs.delete')}
+              </Button>
+              {confirming && (
+                <Button variant="secondary" size="sm" onClick={() => setConfirming(false)}>
+                  {t('action.cancel')}
+                </Button>
+              )}
+            </>
           )}
         </div>
       </td>
@@ -193,16 +199,17 @@ function OrgRow({ org }: OrgRowProps) {
 
 export function OrganizationsPage() {
   const t = useT();
+  const canAdmin = useCanAdmin();
   const [showCreate, setShowCreate] = useState(false);
 
   const { data, isLoading, isError, error, refetch } = useOrganizations();
   const orgs = data?.organizations ?? [];
 
-  const pageActions = (
+  const pageActions = canAdmin ? (
     <Button variant="primary" size="sm" onClick={() => setShowCreate(true)}>
       {t('platform.orgs.createOrg')}
     </Button>
-  );
+  ) : null;
 
   return (
     <div className="page">
@@ -224,7 +231,13 @@ export function OrganizationsPage() {
         {!isLoading && !isError && orgs.length === 0 && (
           <EmptyState
             icon={<IconBuildingOffice />}
+            title={t('platform.orgs.noOrgsTitle')}
             message={t('platform.orgs.noOrgs')}
+            action={canAdmin ? (
+              <Button variant="primary" size="sm" onClick={() => setShowCreate(true)}>
+                {t('platform.orgs.noOrgsCta')}
+              </Button>
+            ) : undefined}
           />
         )}
 

@@ -19,6 +19,7 @@ import type { ChatClient } from '../api/openai';
 import type {
   AccessLogParams,
   DeployOverrides,
+  GdprErasureInput,
   ImportSource,
   InferenceAuditParams,
   MetricsSnapshot,
@@ -39,7 +40,6 @@ export const qk = {
   apiKeys: ['apiKeys'] as const,
   gatewayModels: (baseUrl: string) => ['gatewayModels', baseUrl] as const,
   reconcilerStatus: ['reconcilerStatus'] as const,
-  sloCompliance: (windowHours: number) => ['sloCompliance', windowHours] as const,
 
   dataPlanes: ['dataPlanes'] as const,
   serviceAccounts: ['serviceAccounts'] as const,
@@ -376,12 +376,47 @@ export function useUsageSummary() {
  * Returns 402 when the "billing" enterprise feature is not licensed; callers
  * should detect ApiError with status 402 and show an upgrade prompt.
  */
-export function useBillingReport(params: { days: number; tenantId?: string }) {
+export function useBillingReport(params: { days: number; tenantId?: string; slaThresholdMs?: number }) {
   const end = new Date().toISOString();
   const start = new Date(Date.now() - params.days * 86400000).toISOString();
   return useQuery({
     queryKey: ['billing', params],
-    queryFn: () => api.getBillingReport(start, end, params.tenantId),
+    queryFn: () => api.getBillingReport(start, end, params.tenantId, params.slaThresholdMs),
+  });
+}
+
+/**
+ * GET /api/v1/billing/models/adoption — per-model request/token time-series.
+ * Enterprise-gated (billing); 402 surfaces as an ApiError the caller can gate on.
+ */
+export function useModelAdoption(params: { window?: 'daily' | 'weekly'; days?: number } = {}) {
+  const window = params.window ?? 'daily';
+  const days = params.days ?? 30;
+  return useQuery({
+    queryKey: ['modelAdoption', window, days],
+    queryFn: () => api.getModelAdoption(window, days),
+  });
+}
+
+/** GET /api/v1/platform/orgs/{orgId}/billing — per-org billing rollup. */
+export function useOrgBilling(orgId: string | undefined, days: number) {
+  const end = new Date().toISOString();
+  const start = new Date(Date.now() - days * 86400000).toISOString();
+  return useQuery({
+    queryKey: ['orgBilling', orgId ?? '', days],
+    queryFn: () => api.getOrgBilling(orgId as string, start, end),
+    enabled: Boolean(orgId),
+  });
+}
+
+/** GET /api/v1/platform/teams/{teamId}/billing — per-team billing rollup. */
+export function useTeamBilling(teamId: string | undefined, days: number) {
+  const end = new Date().toISOString();
+  const start = new Date(Date.now() - days * 86400000).toISOString();
+  return useQuery({
+    queryKey: ['teamBilling', teamId ?? '', days],
+    queryFn: () => api.getTeamBilling(teamId as string, start, end),
+    enabled: Boolean(teamId),
   });
 }
 
@@ -395,6 +430,33 @@ export function useAuditLog(limit = 100) {
   return useQuery({
     queryKey: ['auditLog', limit],
     queryFn: () => api.getAuditLog(limit),
+  });
+}
+
+// --- compliance / GDPR (enterprise-gated) -----------------------------------
+
+/**
+ * GET /api/v1/gdpr/erasure-log — read-only trail of past right-to-erasure
+ * operations. Enterprise-gated ("gdpr" feature, admin); the backend currently
+ * returns an empty list, so callers must handle the empty state gracefully.
+ */
+export function useGdprErasureLog() {
+  return useQuery({
+    queryKey: ['gdprErasureLog'],
+    queryFn: () => api.getGdprErasureLog(),
+  });
+}
+
+/**
+ * POST /api/v1/gdpr/erasure — pseudonymise inference-audit records for a data
+ * subject. On success the erasure-log query is invalidated so a future listing
+ * (once the backend implements it) reflects the new entry.
+ */
+export function useGdprErasure() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: GdprErasureInput) => api.eraseSubject(input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['gdprErasureLog'] }),
   });
 }
 
@@ -595,6 +657,23 @@ export function useCreateNodePool() {
   });
 }
 
+export function useUpdateNodePool() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: Parameters<typeof api.updateNodePool>[1] }) =>
+      api.updateNodePool(id, input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['nodePools'] }),
+  });
+}
+
+export function useDeleteNodePool() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.deleteNodePool(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['nodePools'] }),
+  });
+}
+
 export function usePoolNodes(poolId: string | undefined) {
   return useQuery({
     queryKey: ['poolNodes', poolId ?? ''],
@@ -655,6 +734,57 @@ export function useMyTeamPermissions(teamId: string | undefined) {
   });
 }
 
+// --- v0.4 RBAC: custom roles + permission catalog --------------------------
+
+export const roleQk = {
+  list: (orgId: string) => ['roles', orgId] as const,
+  permissions: ['permissionCatalog'] as const,
+};
+
+/** GET /api/v1/platform/orgs/{orgId}/roles — built-in + custom roles for an org. */
+export function useRoles(orgId: string | undefined) {
+  return useQuery({
+    queryKey: roleQk.list(orgId ?? ''),
+    queryFn: () => api.listRoles(orgId as string),
+    enabled: Boolean(orgId),
+  });
+}
+
+/** GET /api/v1/platform/permissions — the fine-grained permission catalog. */
+export function usePermissionCatalog() {
+  return useQuery({
+    queryKey: roleQk.permissions,
+    queryFn: () => api.listPermissions(),
+    // The catalog is effectively static for a given control-plane version.
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useCreateRole(orgId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: Parameters<typeof api.createRole>[1]) => api.createRole(orgId, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: roleQk.list(orgId) }),
+  });
+}
+
+export function useUpdateRole(orgId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Parameters<typeof api.updateRole>[2] }) =>
+      api.updateRole(orgId, id, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: roleQk.list(orgId) }),
+  });
+}
+
+export function useDeleteRole(orgId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.deleteRole(orgId, id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: roleQk.list(orgId) }),
+  });
+}
+
 // --- data planes ------------------------------------------------------------
 
 export function useDataPlanes() {
@@ -676,6 +806,55 @@ export function useCreateDataPlane() {
 export function useRefreshDataPlaneConfig() {
   return useMutation({
     mutationFn: (id: string) => api.refreshDataPlaneConfig(id),
+  });
+}
+
+export function useUpdateDataPlane() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: Parameters<typeof api.updateDataPlane>[1] }) =>
+      api.updateDataPlane(id, input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.dataPlanes }),
+  });
+}
+
+export function useDeleteDataPlane() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.deleteDataPlane(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.dataPlanes }),
+  });
+}
+
+export function useDataPlaneNodes(id: string | undefined) {
+  return useQuery({
+    queryKey: ['dataPlaneNodes', id ?? ''],
+    queryFn: () => api.listDataPlaneNodes(id as string),
+    enabled: Boolean(id),
+  });
+}
+
+export function useAssignNodeToDataPlane() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, nodeId }: { id: string; nodeId: string }) =>
+      api.assignNodeToDataPlane(id, nodeId),
+    onSuccess: (_d, { id }) => {
+      qc.invalidateQueries({ queryKey: ['dataPlaneNodes', id] });
+      qc.invalidateQueries({ queryKey: qk.dataPlanes });
+    },
+  });
+}
+
+export function useUnassignNodeFromDataPlane() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, nodeId }: { id: string; nodeId: string }) =>
+      api.unassignNodeFromDataPlane(id, nodeId),
+    onSuccess: (_d, { id }) => {
+      qc.invalidateQueries({ queryKey: ['dataPlaneNodes', id] });
+      qc.invalidateQueries({ queryKey: qk.dataPlanes });
+    },
   });
 }
 
@@ -735,21 +914,6 @@ export function useApiKeyTeamSlugs(): string[] {
 export function useWhatIfPlan() {
   return useMutation({
     mutationFn: (request: WhatIfRequest) => api.whatIfPlan(request),
-  });
-}
-
-// --- SLO compliance ---------------------------------------------------------
-
-export function useSloCompliance(windowHours = 24) {
-  return useQuery({
-    queryKey: qk.sloCompliance(windowHours),
-    queryFn: () =>
-      api.getSloCompliance(windowHours).catch((e: unknown) => {
-        // 404 = endpoint not available in this CP version (pre-v0.6); hide silently.
-        if (e instanceof Error && e.message.includes('404')) return null;
-        throw e;
-      }),
-    refetchInterval: 60_000,
   });
 }
 
@@ -844,5 +1008,66 @@ export function useDeletePolicy() {
   return useMutation({
     mutationFn: (name: string) => api.deletePolicy(name),
     onSuccess: () => qc.invalidateQueries({ queryKey: policyQk.list }),
+  });
+}
+
+// --- HA / Raft cluster status ----------------------------------------------
+
+/**
+ * GET /api/v1/cluster/status — Raft topology (leader / state / peers).
+ * The endpoint is UNauthenticated and always returns 200 (standalone or raft),
+ * so a single-node cluster reports `mode: "standalone", isLeader: true` rather
+ * than erroring. Refreshed on an interval so a leadership change is visible.
+ */
+export function useClusterStatus() {
+  return useQuery({
+    queryKey: ['clusterStatus'],
+    queryFn: () => api.getClusterStatus(),
+    refetchInterval: 15_000,
+    retry: 1,
+  });
+}
+
+// --- config-as-code (purser.yaml desired state) ----------------------------
+
+export const configCodeQk = {
+  export: ['configExport'] as const,
+};
+
+/** GET /api/v1/config/export — current cluster config as a raw YAML document. */
+export function useConfigExport() {
+  return useQuery({
+    queryKey: configCodeQk.export,
+    queryFn: () => api.exportConfig(),
+    // The exported config only changes when models/deployments change; no need
+    // to poll aggressively. Operators can refetch explicitly.
+    refetchOnWindowFocus: false,
+    staleTime: 30_000,
+  });
+}
+
+/** POST /api/v1/config/diff — dry-run a submitted config. Safe (no mutation). */
+export function useConfigDiff() {
+  return useMutation({
+    mutationFn: (yaml: string) => api.diffConfig(yaml),
+  });
+}
+
+/**
+ * POST /api/v1/config/apply — apply a submitted config. MUTATING, cluster-wide.
+ * On success the read-mostly caches that an apply can change (catalog,
+ * deployments, capacity, the config export itself) are invalidated so every
+ * open view reflects the new desired state.
+ */
+export function useConfigApply() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (yaml: string) => api.applyConfig(yaml),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: configCodeQk.export });
+      qc.invalidateQueries({ queryKey: qk.catalog });
+      qc.invalidateQueries({ queryKey: qk.deployments });
+      qc.invalidateQueries({ queryKey: qk.capacity });
+    },
   });
 }

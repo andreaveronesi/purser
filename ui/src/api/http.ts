@@ -22,6 +22,7 @@ import type {
   AccessLogParams,
   AccessLogResponse,
   ApiKey,
+  CurrentUser,
   ApiKeyWithSecret,
   Assignment,
   AuditEntry,
@@ -33,7 +34,9 @@ import type {
   CatalogEntry,
   ChainVerifyResponse,
   ClusterCapacity,
+  CustomRole,
   DataPlane,
+  DataPlaneNode,
   DataPlaneWithToken,
   DeployOverrides,
   Deployment,
@@ -43,6 +46,9 @@ import type {
   EffectivePermissions,
   EnterpriseStatus,
   FitVerdict,
+  GdprErasureInput,
+  GdprErasureLogEntry,
+  GdprErasureResult,
   ImportSource,
   InferenceAuditParams,
   InferenceAuditResponse,
@@ -52,31 +58,48 @@ import type {
   LinkQuality,
   MetricsSnapshot,
   MetricsStreamHandlers,
+  ModelAdoptionResponse,
   ModelHealth,
   ModelSpec,
   NodeLoadStatus,
   NodePool,
   NodeView,
   Organization,
+  OrgBillingReport,
   PerfEstimate,
+  PermissionsResponse,
   PlatformUser,
   PlanPreviewResult,
   PoliciesResponse,
   Policy,
   PoolTeamQuota,
+  ClusterStatus,
+  ConfigApplyResult,
+  ConfigDiff,
   ReconcilerStatus,
   Role,
+  RolesResponse,
   ServiceAccount,
   ServiceAccountWithSecret,
   SloApiResponse,
-  SloComplianceResponse,
+  SloModelEntry,
   Team,
+  TeamBillingReport,
   TeamMember,
+  UpdateDataPlaneInput,
+  UpdateNodePoolInput,
   UsageSummary,
   WhatIfRequest,
   WhatIfResult,
 } from './types';
-import type { CreateApiKeyInput, CreateDataPlaneInput, CreateServiceAccountInput, PurserApi } from './client';
+import type {
+  CreateApiKeyInput,
+  CreateDataPlaneInput,
+  CreateRoleInput,
+  CreateServiceAccountInput,
+  PurserApi,
+  UpdateRoleInput,
+} from './client';
 
 // --- error type -------------------------------------------------------------
 
@@ -186,7 +209,93 @@ function createClient(baseUrl: string) {
     return camelizeKeys(JSON.parse(text)) as T;
   }
 
-  return { request };
+  /**
+   * Like `request`, but returns the RAW response body text without JSON parsing
+   * or key camelization. Used for documents the server emits verbatim — the
+   * compliance exports (snake_case JSON downloaded as-is) and the config-as-code
+   * export (a YAML document, not JSON). Error handling (ApiError, 401 redirect)
+   * is identical to `request`, so an enterprise gate still surfaces as a 402.
+   */
+  async function requestText(path: string): Promise<string> {
+    let res: Response;
+    try {
+      res = await fetch(`${baseUrl}${path}`, {
+        method: 'GET',
+        headers: { Accept: 'application/yaml, application/json, text/plain' },
+        credentials: 'same-origin',
+      });
+    } catch (err) {
+      throw new ApiError(0, err instanceof Error ? err.message : 'Network error');
+    }
+    if (!res.ok) {
+      let body: unknown;
+      let message = `HTTP ${res.status}`;
+      try {
+        body = camelizeKeys(await res.json());
+        const m =
+          body && typeof body === 'object'
+            ? ((body as Record<string, unknown>).message ??
+              (body as Record<string, unknown>).error)
+            : undefined;
+        if (typeof m === 'string' && m.length > 0) message = m;
+      } catch {
+        /* non-JSON error body — keep the status message */
+      }
+      if (res.status === 401) {
+        const { handleUnauthorized } = await import('./config');
+        handleUnauthorized();
+      }
+      throw new ApiError(res.status, message, body);
+    }
+    return res.text();
+  }
+
+  /**
+   * POST a RAW text body (e.g. a purser.yaml document) and parse the JSON
+   * response (camelized). Unlike `request`, the body is sent verbatim with a
+   * `text/yaml` content type — the config diff/apply endpoints read the raw
+   * bytes and parse them server-side, so we must NOT JSON-encode the body.
+   * Error handling (ApiError, 401 redirect) mirrors `request`.
+   */
+  async function requestRaw<T>(path: string, bodyText: string): Promise<T> {
+    let res: Response;
+    try {
+      res = await fetch(`${baseUrl}${path}`, {
+        method: 'POST',
+        headers: { Accept: 'application/json', 'Content-Type': 'application/yaml' },
+        credentials: 'same-origin',
+        body: bodyText,
+      });
+    } catch (err) {
+      throw new ApiError(0, err instanceof Error ? err.message : 'Network error');
+    }
+    if (!res.ok) {
+      let body: unknown;
+      let message = `HTTP ${res.status}`;
+      try {
+        body = camelizeKeys(await res.json());
+        const m =
+          body && typeof body === 'object'
+            ? ((body as Record<string, unknown>).message ??
+              (body as Record<string, unknown>).error)
+            : undefined;
+        if (typeof m === 'string' && m.length > 0) message = m;
+      } catch {
+        /* non-JSON error body — keep the status message */
+      }
+      if (res.status === 401) {
+        const { handleUnauthorized } = await import('./config');
+        handleUnauthorized();
+      }
+      throw new ApiError(res.status, message, body);
+    }
+    if (res.status === 204) return undefined as T;
+    const text = await res.text();
+    if (!text) return undefined as T;
+    return camelizeKeys(JSON.parse(text)) as T;
+  }
+
+  return { request, requestText, requestRaw };
 }
 
 // --- normalizers (graceful, backend-shape-tolerant) -------------------------
@@ -194,6 +303,15 @@ function createClient(baseUrl: string) {
 const num = (v: unknown, d = 0): number => (typeof v === 'number' && isFinite(v) ? v : d);
 const str = (v: unknown, d = ''): string => (typeof v === 'string' ? v : d);
 const bool = (v: unknown, d = false): boolean => (typeof v === 'boolean' ? v : d);
+
+/**
+ * Like `num`, but returns null when the value is absent (undefined / null)
+ * rather than defaulting to 0.  Use for fields where zero is a real, valid
+ * measurement (e.g. VRAM on a CPU-only cluster) and the caller must
+ * distinguish "the backend didn't send this field" from "the backend sent 0".
+ */
+const numOrNull = (v: unknown): number | null =>
+  v === undefined || v === null ? null : (typeof v === 'number' && isFinite(v) ? v : null);
 
 /** Normalize a proto-style UPPER_CASE enum string to its short lowercase form.
  *  e.g. "NODE_STATE_READY" → "ready", "BACKEND_CPU" → "cpu", "OS_LINUX" → "linux".
@@ -323,12 +441,18 @@ function normalizeDeployment(raw: unknown): Deployment {
       progress: state === 'active' ? 1 : 0,
       detail: '',
     }));
+    // Propagate detail.error (e.g. "host node-… not ready") so the UI can
+    // surface why a stopped/failed deployment has no nodes active.
+    const detailError = typeof detail.error === 'string' && detail.error ? detail.error : undefined;
     return {
       id: str(d.id, plan.planId),
       plan,
       state,
       nodeStatus,
-      createdAt: str(d.createdAt, new Date().toISOString()),
+      // Do NOT fabricate now() — an absent createdAt is represented as '' so
+      // the UI can show "—" instead of a misleading "just now" timestamp.
+      createdAt: str(d.createdAt),
+      ...(detailError !== undefined ? { error: detailError } : {}),
     };
   }
 
@@ -352,7 +476,9 @@ function normalizeDeployment(raw: unknown): Deployment {
     plan,
     state: normalizeDeploymentState(d.state),
     nodeStatus,
-    createdAt: str(d.createdAt, new Date().toISOString()),
+    // Do NOT fabricate now() for a missing createdAt — use '' so the UI
+    // renders "—" rather than a misleading "just now" timestamp.
+    createdAt: str(d.createdAt),
   };
 }
 
@@ -378,10 +504,12 @@ function normalizeCapacity(raw: unknown): ClusterCapacity {
     // nodeCount/readyNodeCount. Accept both.
     nodeCount: num(c.nodeCount !== undefined ? c.nodeCount : c.totalNodes),
     readyNodeCount: num(c.readyNodeCount !== undefined ? c.readyNodeCount : c.readyNodes),
-    ramTotalGb: num(c.ramTotalGb),
-    ramAvailableGb: num(c.ramAvailableGb),
-    vramTotalGb: num(c.vramTotalGb),
-    vramAvailableGb: num(c.vramAvailableGb),
+    // Use numOrNull so that an absent field becomes null ("not measured") while
+    // an explicit 0 from the backend (CPU-only cluster) stays 0 (real value).
+    ramTotalGb: numOrNull(c.ramTotalGb),
+    ramAvailableGb: numOrNull(c.ramAvailableGb),
+    vramTotalGb: numOrNull(c.vramTotalGb),
+    vramAvailableGb: numOrNull(c.vramAvailableGb),
     gpuCount: num(c.gpuCount),
     backends: Array.isArray(c.backends) ? (c.backends as Backend[]) : [],
     fp4Capable: bool(c.fp4Capable),
@@ -453,7 +581,7 @@ function normalizeNodeView(raw: unknown): NodeView {
     profile: profile as unknown as NodeView['profile'],
     metrics: null,
     role: null,
-    linkQuality: 'unknown',
+    linkQuality: (str(n.linkQuality, 'unknown') as LinkQuality) || 'unknown',
     deploymentId: null,
   };
 }
@@ -527,13 +655,45 @@ function normalizeFit(raw: unknown, model: ModelSpec, deployable: unknown): FitV
   };
 }
 
+/**
+ * Returns true iff `s` is a URL string that has a non-empty hostname and can
+ * be used as the control-plane base URL in enrollment commands.
+ *
+ * Considers the following NOT usable (they all come from an unconfigured server
+ * that falls back to its bind address):
+ *   ""            — empty string
+ *   ":8080"       — port-only, no host (Go bind address)
+ *   "http://:8080" — empty host component
+ *
+ * Exported so tests can verify the predicate in isolation.
+ */
+export function usableUrl(s: string): boolean {
+  if (s === '' || s.startsWith(':')) return false;
+  try {
+    // Use window.location.origin as a base so relative strings don't accidentally
+    // become absolute (they won't have a real host and hostname will be empty).
+    const u = new URL(s, typeof window !== 'undefined' ? window.location.origin : 'http://localhost');
+    return u.hostname !== '';
+  } catch {
+    return false;
+  }
+}
+
 function normalizeJoinInfo(raw: unknown): JoinInfo {
   const j = (raw ?? {}) as Record<string, unknown>;
+  // The server includes control_plane_url (→ controlPlaneUrl after camelizeKeys)
+  // when it has a configured PublicAddr.  Fall back to the browser origin so
+  // install commands never contain an empty or host-less --control-plane argument.
+  // usableUrl() rejects bind-address strings like ":8080" or "http://:8080" that
+  // the server emits when PURSER_PUBLIC_ADDR is not set.
+  const serverUrl = str(j.controlPlaneUrl);
+  const controlPlaneUrl =
+    usableUrl(serverUrl) ? serverUrl : (typeof window !== 'undefined' ? window.location.origin : '');
   return {
     // API returns "token" in the wire format (camelizeKeys keeps it as "token").
     // Support both "joinToken" (legacy) and "token" (current) for back-compat.
     joinToken: str(j.joinToken ?? j.token),
-    controlPlaneUrl: str(j.controlPlaneUrl),
+    controlPlaneUrl,
     expiresAt: str(j.expiresAt ?? j.expiresAt),
   };
 }
@@ -624,6 +784,9 @@ const enc = encodeURIComponent;
 
 function normalizeApproval(raw: unknown): DeploymentApproval {
   const a = (raw ?? {}) as Record<string, unknown>;
+  // quorum is present on GET /approvals/{id} (detail fetch); absent on list responses.
+  // camelizeKeys has already converted required_approvals → requiredApprovals etc.
+  const rawQuorum = a.quorum as Record<string, unknown> | undefined;
   return {
     id: typeof a.id === 'number' ? a.id : 0,
     deploymentId: str(a.deploymentId),
@@ -634,11 +797,18 @@ function normalizeApproval(raw: unknown): DeploymentApproval {
     reviewer: a.reviewer ? str(a.reviewer) : undefined,
     reviewedAt: a.reviewedAt ? str(a.reviewedAt) : undefined,
     notes: a.notes ? str(a.notes) : undefined,
+    quorum: rawQuorum
+      ? {
+          required: num(rawQuorum.required),
+          received: num(rawQuorum.received),
+          remaining: num(rawQuorum.remaining),
+        }
+      : undefined,
   };
 }
 
 export function createHttpApi(baseUrl: string): PurserApi {
-  const { request } = createClient(baseUrl);
+  const { request, requestText, requestRaw } = createClient(baseUrl);
 
   return {
     // --- fleet ---
@@ -877,9 +1047,10 @@ export function createHttpApi(baseUrl: string): PurserApi {
       request<unknown>('/reconciler/status').then((raw) => raw as ReconcilerStatus),
 
     // --- billing / chargeback ---
-    getBillingReport: (start: string, end: string, tenantId?: string): Promise<BillingReport> => {
+    getBillingReport: (start: string, end: string, tenantId?: string, slaThresholdMs?: number): Promise<BillingReport> => {
       const params = new URLSearchParams({ start, end });
       if (tenantId) params.set('tenant_id', tenantId);
+      if (slaThresholdMs != null) params.set('sla_threshold_ms', String(slaThresholdMs));
       return request<BillingReport>(`/billing/report?${params.toString()}`);
     },
 
@@ -906,6 +1077,31 @@ export function createHttpApi(baseUrl: string): PurserApi {
       if (tenantId) params.set('tenant_id', tenantId);
       const qs = params.toString() ? `?${params.toString()}` : '';
       return request<BillingSummary>(`/billing/summary${qs}`);
+    },
+
+    // GET /api/v1/billing/models/adoption — per-model request/token time-series.
+    getModelAdoption: (window: 'daily' | 'weekly' = 'daily', days = 30): Promise<ModelAdoptionResponse> => {
+      const params = new URLSearchParams({ window, days: String(days) });
+      return request<unknown>(`/billing/models/adoption?${params.toString()}`).then((raw) => {
+        const r = (raw ?? {}) as Record<string, unknown>;
+        return {
+          window: r.window === 'weekly' ? 'weekly' : 'daily',
+          days: typeof r.days === 'number' ? r.days : days,
+          series: Array.isArray(r.series) ? (r.series as ModelAdoptionResponse['series']) : [],
+        };
+      });
+    },
+
+    // GET /api/v1/platform/orgs/{orgId}/billing — per-org billing rollup.
+    getOrgBilling: (orgId: string, start: string, end: string): Promise<OrgBillingReport> => {
+      const params = new URLSearchParams({ start, end });
+      return request<OrgBillingReport>(`/platform/orgs/${enc(orgId)}/billing?${params.toString()}`);
+    },
+
+    // GET /api/v1/platform/teams/{teamId}/billing — per-team billing rollup.
+    getTeamBilling: (teamId: string, start: string, end: string): Promise<TeamBillingReport> => {
+      const params = new URLSearchParams({ start, end });
+      return request<TeamBillingReport>(`/platform/teams/${enc(teamId)}/billing?${params.toString()}`);
     },
 
     // --- v0.4 platform model: organizations ---
@@ -954,8 +1150,16 @@ export function createHttpApi(baseUrl: string): PurserApi {
     getNodePool: (id) =>
       request<NodePool>(`/platform/pools/${enc(id)}`),
 
+    // PUT /api/v1/platform/pools/{id} — update name/description/policy.
+    updateNodePool: (id, input: UpdateNodePoolInput) =>
+      request<NodePool>(`/platform/pools/${enc(id)}`, { method: 'PUT', body: input }),
+
+    // DELETE /api/v1/platform/pools/{id} — 204 on success; 409 if nodes assigned.
+    deleteNodePool: (id) =>
+      request<void>(`/platform/pools/${enc(id)}`, { method: 'DELETE' }),
+
     listPoolNodes: (poolId) =>
-      request<{ node_ids: string[] }>(`/platform/pools/${enc(poolId)}/nodes`),
+      request<{ nodeIds: string[] }>(`/platform/pools/${enc(poolId)}/nodes`),
 
     assignNodeToPool: (poolId, nodeId) =>
       request<void>(`/platform/pools/${enc(poolId)}/nodes/${enc(nodeId)}`, { method: 'PUT' }),
@@ -974,10 +1178,82 @@ export function createHttpApi(baseUrl: string): PurserApi {
 
     // --- v0.4 platform model: current user ---
     getMe: () =>
-      request<{ actor: string; orgs: Organization[]; teams: Team[] }>('/platform/me'),
+      request<CurrentUser>('/platform/users/me'),
+
+    // Note: /auth/ldap-login is served by the auth router (not /api/v1), so we
+    // call fetch directly with an absolute path to avoid the /api/v1 base prefix.
+    ldapLogin: (username: string, password: string) =>
+      fetch('/auth/ldap-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ username, password }),
+      }).then(async (res) => {
+        if (!res.ok) {
+          const body: unknown = await res.json().catch(() => ({}));
+          const msg =
+            body && typeof body === 'object'
+              ? ((body as Record<string, unknown>).message ?? 'LDAP login failed')
+              : 'LDAP login failed';
+          throw new ApiError(res.status, String(msg));
+        }
+      }),
+
+    // Note: /auth/local-login is served by the auth router (not /api/v1), so we
+    // call fetch directly with an absolute path to avoid the /api/v1 base prefix.
+    // On success the server sets a session cookie and 302s to /. A same-origin
+    // fetch surfaces that redirect as an opaque response (type 'opaqueredirect')
+    // rather than following it, so we treat both a 2xx/3xx `ok` response and an
+    // opaque redirect as success.
+    localLogin: (username: string, password: string) =>
+      fetch('/auth/local-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ username, password }),
+      }).then(async (res) => {
+        if (res.type === 'opaqueredirect') return;
+        if (!res.ok) {
+          const body: unknown = await res.json().catch(() => ({}));
+          const msg =
+            body && typeof body === 'object'
+              ? ((body as Record<string, unknown>).message ?? 'Local login failed')
+              : 'Local login failed';
+          throw new ApiError(res.status, String(msg));
+        }
+      }),
 
     getMyTeamPermissions: (teamId) =>
       request<EffectivePermissions>(`/platform/teams/${enc(teamId)}/my-permissions`),
+
+    // --- v0.4 RBAC: custom roles (org-scoped) + permission catalog ---
+    listRoles: (orgId): Promise<RolesResponse> =>
+      request<unknown>(`/platform/orgs/${enc(orgId)}/roles`).then((raw) => {
+        const r = (raw ?? {}) as Record<string, unknown>;
+        return { roles: Array.isArray(r.roles) ? (r.roles as CustomRole[]) : [] };
+      }),
+
+    createRole: (orgId, data: CreateRoleInput) =>
+      request<CustomRole>(`/platform/orgs/${enc(orgId)}/roles`, { method: 'POST', body: data }),
+
+    getRole: (orgId, id) =>
+      request<CustomRole>(`/platform/orgs/${enc(orgId)}/roles/${enc(id)}`),
+
+    updateRole: (orgId, id, data: UpdateRoleInput) =>
+      request<CustomRole>(`/platform/orgs/${enc(orgId)}/roles/${enc(id)}`, { method: 'PUT', body: data }),
+
+    deleteRole: (orgId, id) =>
+      request<void>(`/platform/orgs/${enc(orgId)}/roles/${enc(id)}`, { method: 'DELETE' }),
+
+    listPermissions: (): Promise<PermissionsResponse> =>
+      request<unknown>('/platform/permissions').then((raw) => {
+        const r = (raw ?? {}) as Record<string, unknown>;
+        return {
+          permissions: Array.isArray(r.permissions)
+            ? (r.permissions as PermissionsResponse['permissions'])
+            : [],
+        };
+      }),
 
     // --- inference audit ---
     listInferenceAudit: (params: InferenceAuditParams = {}): Promise<InferenceAuditResponse> => {
@@ -1007,24 +1283,48 @@ export function createHttpApi(baseUrl: string): PurserApi {
     whatIfPlan: (body: WhatIfRequest): Promise<WhatIfResult> =>
       request<WhatIfResult>('/planner/what-if', { method: 'POST', body }),
 
-    // --- SLO compliance ---
-    getSloCompliance: (windowHours = 24): Promise<SloComplianceResponse> =>
-      request<unknown>(`/slo/compliance?window_hours=${windowHours}`).then((raw) => {
-        const r = (raw ?? {}) as Record<string, unknown>;
-        return {
-          models: Array.isArray(r.models) ? r.models as SloComplianceResponse['models'] : [],
-          window_hours: typeof r.windowHours === 'number' ? r.windowHours : windowHours,
-        };
-      }),
-
     // --- SLO compliance (full nested shape, v0.6) ---
     getSloComplianceFull: (windowHours = 24): Promise<SloApiResponse> =>
       request<unknown>(`/slo/compliance?window_hours=${windowHours}`).then((raw) => {
         const r = (raw ?? {}) as Record<string, unknown>;
+        // camelizeKeys converts window_hours → windowHours and generated_at → generatedAt,
+        // so we must check both forms to handle direct snake_case pass-through too.
+        const wh = r.windowHours ?? r.window_hours;
+        const ga = r.generatedAt ?? r.generated_at;
+        const models: SloModelEntry[] = Array.isArray(r.models)
+          ? r.models.map((m: unknown): SloModelEntry => {
+              const e = (m ?? {}) as Record<string, unknown>;
+              // After camelizeKeys: model_id → modelId, slo.ttft_ms → slo.ttftMs, etc.
+              // Accept both so the normalizer tolerates any camelization state.
+              const slo = (e.slo ?? {}) as Record<string, unknown>;
+              const actual = (e.actual ?? {}) as Record<string, unknown>;
+              // ttft_compliance is *float64 in Go (nil → null); preserve null explicitly.
+              const ttftRaw = actual.ttftCompliance ?? actual.ttft_compliance;
+              const tbtRaw  = actual.tbtCompliance  ?? actual.tbt_compliance;
+              const status = str(e.status);
+              return {
+                model_id: str(e.modelId ?? e.model_id),
+                slo: {
+                  ttft_ms:           num(slo.ttftMs          ?? slo.ttft_ms,          2000),
+                  tbt_ms:            num(slo.tbtMs           ?? slo.tbt_ms,           500),
+                  target_compliance: num(slo.targetCompliance ?? slo.target_compliance, 0.95),
+                },
+                actual: {
+                  ttft_compliance: ttftRaw !== null && ttftRaw !== undefined ? num(ttftRaw) : null,
+                  tbt_compliance:  tbtRaw  !== null && tbtRaw  !== undefined ? num(tbtRaw)  : null,
+                  request_count:   num(actual.requestCount ?? actual.request_count),
+                  period_start:    str(actual.periodStart  ?? actual.period_start),
+                },
+                status: (['met', 'breached', 'insufficient_data'].includes(status)
+                  ? status
+                  : 'insufficient_data') as SloModelEntry['status'],
+              };
+            })
+          : [];
         return {
-          models: Array.isArray(r.models) ? (r.models as SloApiResponse['models']) : [],
-          window_hours: typeof r.window_hours === 'number' ? r.window_hours : windowHours,
-          generated_at: typeof r.generated_at === 'string' ? r.generated_at : new Date().toISOString(),
+          models,
+          window_hours: typeof wh === 'number' ? wh : windowHours,
+          generated_at: typeof ga === 'string' ? ga : new Date().toISOString(),
         };
       }),
 
@@ -1058,6 +1358,42 @@ export function createHttpApi(baseUrl: string): PurserApi {
 
     refreshDataPlaneConfig: (id: string): Promise<void> =>
       request<void>(`/platform/dataplanes/${enc(id)}/config/refresh`, { method: 'POST' }),
+
+    // PUT /api/v1/platform/dataplanes/{id} — snakeizeKeys turns gatewayUrl → gateway_url.
+    updateDataPlane: (id: string, input: UpdateDataPlaneInput): Promise<DataPlane> =>
+      request<unknown>(`/platform/dataplanes/${enc(id)}`, {
+        method: 'PUT',
+        body: input,
+      }).then((raw) => (raw ?? {}) as DataPlane),
+
+    // DELETE /api/v1/platform/dataplanes/{id} — 204 on success.
+    deleteDataPlane: (id: string): Promise<void> =>
+      request<void>(`/platform/dataplanes/${enc(id)}`, { method: 'DELETE' }),
+
+    // GET /api/v1/platform/dataplanes/{id}/nodes — unwraps { nodes: [...] }.
+    listDataPlaneNodes: (id: string): Promise<DataPlaneNode[]> =>
+      request<unknown>(`/platform/dataplanes/${enc(id)}/nodes`).then((raw) => {
+        const arr = (raw as Record<string, unknown>)?.nodes ?? raw;
+        if (!Array.isArray(arr)) return [];
+        return arr.map((n: unknown) => {
+          const e = (n ?? {}) as Record<string, unknown>;
+          return {
+            id: String(e.id ?? ''),
+            hostname: String(e.hostname ?? e.id ?? ''),
+            state: normalizeEnumStr(e.state, NODE_STATES) || String(e.state ?? ''),
+            os: e.os != null ? String(e.os) : undefined,
+            arch: e.arch != null ? String(e.arch) : undefined,
+          } satisfies DataPlaneNode;
+        });
+      }),
+
+    // POST /api/v1/platform/dataplanes/{id}/nodes/{nodeId} — 204 on success.
+    assignNodeToDataPlane: (id: string, nodeId: string): Promise<void> =>
+      request<void>(`/platform/dataplanes/${enc(id)}/nodes/${enc(nodeId)}`, { method: 'POST' }),
+
+    // DELETE /api/v1/platform/dataplanes/{id}/nodes/{nodeId} — 204 on success.
+    unassignNodeFromDataPlane: (id: string, nodeId: string): Promise<void> =>
+      request<void>(`/platform/dataplanes/${enc(id)}/nodes/${enc(nodeId)}`, { method: 'DELETE' }),
 
     // --- service accounts ---
     listServiceAccounts: (): Promise<ServiceAccount[]> =>
@@ -1112,6 +1448,46 @@ export function createHttpApi(baseUrl: string): PurserApi {
         });
       }),
 
+    // --- compliance (AI Act + GDPR; all enterprise-gated) ---
+
+    // Raw text so the downloaded file is byte-faithful to the server response.
+    getAiActTechnicalDoc: (): Promise<string> =>
+      requestText('/compliance/ai-act/technical-doc'),
+
+    getGdprRecordOfProcessing: (): Promise<string> =>
+      requestText('/compliance/gdpr/record-of-processing'),
+
+    // POST /api/v1/gdpr/erasure — body snakeized to subject_type / subject_identifier / reason.
+    eraseSubject: (input: GdprErasureInput): Promise<GdprErasureResult> =>
+      request<unknown>('/gdpr/erasure', { method: 'POST', body: input }).then((raw) => {
+        const r = (raw ?? {}) as Record<string, unknown>;
+        return {
+          erasedEvents: num(r.erasedEvents),
+          erasureType: str(r.erasureType, 'inference_audit'),
+          completedAt: str(r.completedAt, new Date().toISOString()),
+          subjectPrefix: str(r.subjectPrefix),
+        } satisfies GdprErasureResult;
+      }),
+
+    // GET /api/v1/gdpr/erasure-log — { erasures: [...] }; backend stub returns [].
+    getGdprErasureLog: (): Promise<GdprErasureLogEntry[]> =>
+      request<unknown>('/gdpr/erasure-log').then((raw) => {
+        const r = (raw ?? {}) as Record<string, unknown>;
+        const rows = Array.isArray(r.erasures) ? r.erasures : [];
+        return rows.map((row): GdprErasureLogEntry => {
+          const e = (row ?? {}) as Record<string, unknown>;
+          return {
+            id: num(e.id),
+            subjectHash: str(e.subjectHash),
+            erasedAt: str(e.erasedAt),
+            erasedBy: str(e.erasedBy),
+            reason: str(e.reason),
+            eventsErased: num(e.eventsErased),
+            erasureType: str(e.erasureType, 'inference_audit'),
+          };
+        });
+      }),
+
     // --- policy-as-code (enterprise: policy_engine) ---
 
     /** Normalise a raw API policy object to the UI Policy shape. */
@@ -1132,6 +1508,73 @@ export function createHttpApi(baseUrl: string): PurserApi {
 
     deletePolicy: (name: string): Promise<void> =>
       request<void>(`/policies/${enc(name)}`, { method: 'DELETE' }),
+
+    // --- HA / Raft cluster status ---
+    // GET /api/v1/cluster/status -> { mode, is_leader, leader?, state?, stats? }.
+    getClusterStatus: (): Promise<ClusterStatus> =>
+      request<unknown>('/cluster/status').then(normalizeClusterStatus),
+
+    // --- config-as-code ---
+    // GET /api/v1/config/export -> raw purser.yaml document (Content-Type: application/yaml).
+    exportConfig: (): Promise<string> => requestText('/config/export'),
+
+    // POST /api/v1/config/diff -> dry-run diff of the submitted purser.yaml. Safe (no mutation).
+    diffConfig: (yaml: string): Promise<ConfigDiff> =>
+      requestRaw<unknown>('/config/diff', yaml).then(normalizeConfigDiff),
+
+    // POST /api/v1/config/apply -> apply the submitted purser.yaml. MUTATING, cluster-wide.
+    applyConfig: (yaml: string): Promise<ConfigApplyResult> =>
+      requestRaw<unknown>('/config/apply', yaml).then((raw) => {
+        const r = (raw ?? {}) as Record<string, unknown>;
+        // The server wraps the counts under an "applied" key.
+        return normalizeConfigApplyResult(r.applied ?? r);
+      }),
+  };
+}
+
+// --- config-as-code / cluster-status normalizers ---------------------------
+
+function normalizeConfigDiff(raw: unknown): ConfigDiff {
+  const d = (raw ?? {}) as Record<string, unknown>;
+  const objArr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
+  const strArr = (v: unknown): string[] =>
+    Array.isArray(v) ? v.map((x) => str(x)) : [];
+  return {
+    modelsToAdd: objArr(d.modelsToAdd),
+    modelsToRemove: strArr(d.modelsToRemove),
+    deploymentsToAdd: objArr(d.deploymentsToAdd),
+    deploymentsToRemove: strArr(d.deploymentsToRemove),
+    quotasToUpsert: objArr(d.quotasToUpsert),
+  };
+}
+
+function normalizeConfigApplyResult(raw: unknown): ConfigApplyResult {
+  const a = (raw ?? {}) as Record<string, unknown>;
+  return {
+    modelsAdded: num(a.modelsAdded),
+    deploymentsAdded: num(a.deploymentsAdded),
+    quotasUpserted: num(a.quotasUpserted),
+    orgsAdded: num(a.orgsAdded),
+    nodePoolsAdded: num(a.nodePoolsAdded),
+    slosUpserted: num(a.slosUpserted),
+  };
+}
+
+function normalizeClusterStatus(raw: unknown): ClusterStatus {
+  const c = (raw ?? {}) as Record<string, unknown>;
+  const mode = c.mode === 'raft' ? 'raft' : 'standalone';
+  const stats =
+    c.stats && typeof c.stats === 'object'
+      ? Object.fromEntries(
+          Object.entries(c.stats as Record<string, unknown>).map(([k, v]) => [k, String(v)]),
+        )
+      : undefined;
+  return {
+    mode,
+    isLeader: bool(c.isLeader, mode === 'standalone'),
+    leader: typeof c.leader === 'string' && c.leader ? c.leader : undefined,
+    state: typeof c.state === 'string' && c.state ? c.state : undefined,
+    stats,
   };
 }
 
@@ -1153,12 +1596,17 @@ function extractDescription(rego: string): string | undefined {
 
 function normPolicy(raw: Record<string, unknown>): Policy {
   const rego = typeof raw.rego === 'string' ? raw.rego : '';
+  // camelizeKeys converts created_at → createdAt; accept both for tolerance.
+  const createdAt =
+    typeof raw.createdAt === 'string' ? raw.createdAt :
+    typeof raw.created_at === 'string' ? raw.created_at :
+    new Date().toISOString();
   return {
     id: typeof raw.id === 'number' ? raw.id : 0,
     name: typeof raw.name === 'string' ? raw.name : '',
     source: rego,
     enabled: typeof raw.enabled === 'boolean' ? raw.enabled : true,
-    createdAt: typeof raw.created_at === 'string' ? raw.created_at : new Date().toISOString(),
+    createdAt,
     description: extractDescription(rego),
   };
 }

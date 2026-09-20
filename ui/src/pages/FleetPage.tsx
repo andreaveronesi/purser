@@ -7,7 +7,6 @@ import {
   EmptyState,
   ErrorState,
   LoadingBlock,
-  Meter,
   Modal,
   PageHeader,
   StatusPill,
@@ -19,14 +18,11 @@ import {
   useMetricsStream,
   useNodes,
   useNodeAction,
-  useReconcilerStatus,
-  useSloCompliance,
-  type ReconcilerStatus,
 } from '../hooks/queries';
 import { useT, type TFunc } from '../i18n';
 import { gb, tokS } from '../lib/format';
 import { errorMessage } from '../lib/errors';
-import type { ClusterCapacity, EngineMetrics, LinkQuality, NodeView, SloModelCompliance } from '../api/types';
+import type { EngineMetrics, LinkQuality, NodeView } from '../api/types';
 
 const LINK_TONE: Record<LinkQuality, Tone> = {
   excellent: 'success',
@@ -35,63 +31,6 @@ const LINK_TONE: Record<LinkQuality, Tone> = {
   poor: 'danger',
   unknown: 'neutral',
 };
-
-function CapacityCard({
-  cap,
-  liveDecodeTokS,
-  t,
-}: {
-  cap: ClusterCapacity;
-  liveDecodeTokS?: number;
-  t: TFunc;
-}) {
-  // Prefer the live SSE aggregate when a metrics stream is active.
-  const decode = liveDecodeTokS ?? cap.aggregateDecodeTokS;
-  return (
-    <Card title={t('fleet.capacity.title')}>
-      <p className="muted capacity__hint">{t('fleet.capacity.hint')}</p>
-      <div className="stat-grid">
-        <div className="stat">
-          <span className="stat__value">
-            {cap.readyNodeCount}
-            <span className="stat__sub">
-              {' '}
-              {t('common.of')} {cap.nodeCount}
-            </span>
-          </span>
-          <span className="stat__label">{t('fleet.capacity.nodes')}</span>
-        </div>
-        <div className="stat">
-          <span className="stat__value">{cap.gpuCount}</span>
-          <span className="stat__label">{t('fleet.capacity.gpus')}</span>
-        </div>
-        <div className="stat">
-          <span className="stat__value" aria-live="polite">{tokS(decode)}</span>
-          <span className="stat__label">{t('fleet.capacity.throughput')}</span>
-        </div>
-        <div
-          className="stat"
-          title="FP4 (4-bit floating point) quantization acceleration. Reduces memory usage and increases throughput on compatible hardware."
-        >
-          <span className="stat__value">
-            <Badge tone={cap.fp4Capable ? 'success' : 'neutral'}>
-              {cap.fp4Capable ? t('fleet.capacity.fp4.yes') : t('fleet.capacity.fp4.no')}
-            </Badge>
-          </span>
-          <span className="stat__label">{t('fleet.capacity.fp4')}</span>
-        </div>
-      </div>
-      <div className="capacity__meters">
-        <Meter used={cap.ramTotalGb - cap.ramAvailableGb} total={cap.ramTotalGb} label={t('fleet.capacity.ram')} />
-        <Meter
-          used={cap.vramTotalGb - cap.vramAvailableGb}
-          total={cap.vramTotalGb}
-          label={t('fleet.capacity.vram')}
-        />
-      </div>
-    </Card>
-  );
-}
 
 function hardwareSummary(n: NodeView): string {
   const gpus = n.profile.gpus ?? [];
@@ -103,179 +42,10 @@ function hardwareSummary(n: NodeView): string {
   return `${gpu} · ${gb(n.profile.ramTotalGb)} RAM${backends.length > 0 ? ` · ${backends.join('/')}` : ''}`;
 }
 
-/**
- * Shows the control-plane reconciler health status. Handles three states:
- *   - loading  → render nothing while the first fetch is in-flight (TODO: skeleton)
- *   - error    → the endpoint is absent or returned an error; show a neutral
- *                "Status unknown" badge so the operator knows the card is present
- *                but unavailable, rather than silently disappearing.
- *   - data     → state badge + pending/error counts + active event list +
- *                collapsible configuration panel.
- *
- * P-12: the previous `{reconcilerStatus.data && <ReconcilerStatusCard .../>}`
- * guard hid the card entirely during loading and on API error, making it
- * impossible for an operator to distinguish "reconciler not supported" from
- * "dashboard bug". This version keeps the card visible in all states.
- */
-export function ReconcilerStatusCard({
-  status,
-}: {
-  status: ReconcilerStatus | undefined;
-}) {
-  const STATE_TONE: Record<ReconcilerStatus['state'], Tone> = {
-    idle: 'success',
-    syncing: 'info',
-    error: 'danger',
-  };
-
-  if (!status) {
-    return (
-      <Card title="Reconciler">
-        <p>
-          <Badge tone="neutral">Status unknown</Badge>
-          {' '}
-          Reconciler status unknown
-        </p>
-      </Card>
-    );
-  }
-
-  // Active tracker events: only event types that currently have tracked > 0.
-  const activeEvents = Object.entries(status.tracker).filter(([, v]) => v.tracked > 0);
-
-  return (
-    <Card title="Reconciler">
-      <div className="stat-grid">
-        <div className="stat">
-          <span className="stat__value">
-            <Badge tone={STATE_TONE[status.state]}>{status.state}</Badge>
-          </span>
-          <span className="stat__label">State</span>
-        </div>
-        <div className="stat">
-          <span className="stat__value">{status.pendingCount}</span>
-          <span className="stat__label">Pending</span>
-        </div>
-        <div className="stat">
-          <span className="stat__value">{status.errorCount}</span>
-          <span className="stat__label">Errors</span>
-        </div>
-      </div>
-
-      {activeEvents.length > 0 && (
-        <div className="reconciler__events">
-          <p className="muted">Active events</p>
-          <div className="table-wrap">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th scope="col">Event type</th>
-                  <th scope="col">Tracked</th>
-                  <th scope="col">Age (s)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {activeEvents.map(([type, v]) => (
-                  <tr key={type}>
-                    <td><code>{type}</code></td>
-                    <td>{v.tracked}</td>
-                    <td>{v.oldestAgeS.toFixed(0)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      <details className="reconciler__config">
-        <summary className="muted">Configuration</summary>
-        <dl className="reconciler__config-grid">
-          <dt>Interval</dt>
-          <dd data-testid="cfg-interval">{status.config.intervalS}s</dd>
-          <dt>Node timeout</dt>
-          <dd data-testid="cfg-node-timeout">{status.config.nodeTimeoutS}s</dd>
-          <dt>Hysteresis</dt>
-          <dd>{status.config.hysteresisS}s</dd>
-          <dt>Action cooldown</dt>
-          <dd>{status.config.actionCooldownS}s</dd>
-        </dl>
-      </details>
-
-      {status.lastSyncAt && (
-        <p className="muted">
-          Last sync:{' '}
-          <time dateTime={status.lastSyncAt}>
-            {new Date(status.lastSyncAt).toLocaleString()}
-          </time>
-        </p>
-      )}
-    </Card>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// SLO Status card
-// ---------------------------------------------------------------------------
-
-const SLO_TONE: Record<SloModelCompliance['status'], Tone> = {
-  met: 'success',
-  breached: 'danger',
-  insufficient_data: 'neutral',
-};
-
-function SloStatusCard({ t }: { t: TFunc }) {
-  const { data, isLoading, isError, error } = useSloCompliance(24);
-
-  return (
-    <Card title={t('slo.title')}>
-      {isLoading && <LoadingBlock />}
-      {isError && (
-        <ErrorState message={errorMessage(error, t, 'error.slo')} />
-      )}
-      {data && data.models.length === 0 && (
-        <EmptyState message={t('slo.empty')} />
-      )}
-      {data && data.models.length > 0 && (
-        <div className="table-wrap">
-          <table className="table" data-testid="slo-table">
-            <thead>
-              <tr>
-                <th scope="col">{t('slo.col.model')}</th>
-                <th scope="col">{t('slo.col.ttftTarget')}</th>
-                <th scope="col">{t('slo.col.compliance')}</th>
-                <th scope="col">{t('slo.col.status')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.models.map((m) => (
-                <tr key={m.model_id}>
-                  <td>{m.model_id}</td>
-                  <td>{m.ttft_target_ms}</td>
-                  <td>{m.ttft_actual_compliance_pct.toFixed(1)}%</td>
-                  <td>
-                    <Badge tone={SLO_TONE[m.status]}>
-                      {m.status === 'met'
-                        ? t('slo.status.met')
-                        : m.status === 'breached'
-                          ? t('slo.status.breached')
-                          : t('slo.status.insufficientData')}
-                    </Badge>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </Card>
-  );
-}
-
 // ---------------------------------------------------------------------------
 // Node expanded details panel — shown as an accordion row below the node row.
 // Design: datasheet-insert style. Small muted labels, monospace for technical
-// values. var(--surface-2) background so it reads as "inside" the parent row.
+// values. var(--color-surface-2) background so it reads as "inside" the parent row.
 // ---------------------------------------------------------------------------
 
 function NodeDetailPanel({ node, t }: { node: NodeView; t: TFunc }) {
@@ -283,8 +53,8 @@ function NodeDetailPanel({ node, t }: { node: NodeView; t: TFunc }) {
   return (
     <div
       style={{
-        background: 'var(--surface-2)',
-        borderRadius: 'var(--radius)',
+        background: 'var(--color-surface-2)',
+        borderRadius: 'var(--radius-md)',
         padding: '12px 16px',
         margin: '4px 0',
       }}
@@ -299,7 +69,7 @@ function NodeDetailPanel({ node, t }: { node: NodeView; t: TFunc }) {
         }}
       >
         {/* Node ID */}
-        <dt style={{ fontSize: '0.75em', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-muted)', alignSelf: 'center', fontWeight: 600 }}>
+        <dt style={{ fontSize: '0.75em', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-text-muted)', alignSelf: 'center', fontWeight: 600 }}>
           Node ID
         </dt>
         <dd style={{ margin: 0 }}>
@@ -309,13 +79,13 @@ function NodeDetailPanel({ node, t }: { node: NodeView; t: TFunc }) {
         </dd>
 
         {/* Hostname */}
-        <dt style={{ fontSize: '0.75em', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-muted)', alignSelf: 'center', fontWeight: 600 }}>
+        <dt style={{ fontSize: '0.75em', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-text-muted)', alignSelf: 'center', fontWeight: 600 }}>
           Hostname
         </dt>
         <dd style={{ margin: 0, fontWeight: 500 }}>{node.profile.hostname}</dd>
 
         {/* OS / Arch */}
-        <dt style={{ fontSize: '0.75em', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-muted)', alignSelf: 'center', fontWeight: 600 }}>
+        <dt style={{ fontSize: '0.75em', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-text-muted)', alignSelf: 'center', fontWeight: 600 }}>
           Platform
         </dt>
         <dd style={{ margin: 0 }}>
@@ -325,18 +95,18 @@ function NodeDetailPanel({ node, t }: { node: NodeView; t: TFunc }) {
         </dd>
 
         {/* RAM */}
-        <dt style={{ fontSize: '0.75em', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-muted)', alignSelf: 'center', fontWeight: 600 }}>
+        <dt style={{ fontSize: '0.75em', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-text-muted)', alignSelf: 'center', fontWeight: 600 }}>
           RAM
         </dt>
         <dd style={{ margin: 0 }}>
           <span style={{ fontWeight: 500 }}>{gb(node.profile.ramAvailableGb)}</span>
-          <span style={{ color: 'var(--text-muted)', fontSize: '0.875em' }}>
+          <span style={{ color: 'var(--color-text-muted)', fontSize: '0.875em' }}>
             {' '}available / {gb(node.profile.ramTotalGb)} total
           </span>
         </dd>
 
         {/* Link quality */}
-        <dt style={{ fontSize: '0.75em', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-muted)', alignSelf: 'center', fontWeight: 600 }}>
+        <dt style={{ fontSize: '0.75em', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-text-muted)', alignSelf: 'center', fontWeight: 600 }}>
           {t('fleet.col.link')}
         </dt>
         <dd style={{ margin: 0 }}>
@@ -346,10 +116,10 @@ function NodeDetailPanel({ node, t }: { node: NodeView; t: TFunc }) {
         {/* Last seen */}
         {node.profile.lastSeen && (
           <>
-            <dt style={{ fontSize: '0.75em', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-muted)', alignSelf: 'center', fontWeight: 600 }}>
+            <dt style={{ fontSize: '0.75em', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-text-muted)', alignSelf: 'center', fontWeight: 600 }}>
               Last seen
             </dt>
-            <dd style={{ margin: 0, fontSize: '0.875em', color: 'var(--text-muted)' }}>
+            <dd style={{ margin: 0, fontSize: '0.875em', color: 'var(--color-text-muted)' }}>
               <time dateTime={node.profile.lastSeen}>
                 {new Date(node.profile.lastSeen).toLocaleString()}
               </time>
@@ -360,7 +130,7 @@ function NodeDetailPanel({ node, t }: { node: NodeView; t: TFunc }) {
         {/* Inference engines */}
         {engines.length > 0 && (
           <>
-            <dt style={{ fontSize: '0.75em', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-muted)', alignSelf: 'flex-start', fontWeight: 600, paddingTop: '2px' }}>
+            <dt style={{ fontSize: '0.75em', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-text-muted)', alignSelf: 'flex-start', fontWeight: 600, paddingTop: '2px' }}>
               Engines
             </dt>
             <dd style={{ margin: 0, display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
@@ -371,15 +141,15 @@ function NodeDetailPanel({ node, t }: { node: NodeView; t: TFunc }) {
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '4px',
-                    background: 'var(--surface)',
-                    border: '1px solid var(--border)',
+                    background: 'var(--color-surface)',
+                    border: '1px solid var(--color-border)',
                     borderRadius: 'var(--radius-sm)',
                     padding: '2px 8px',
                     fontSize: '0.8em',
                   }}
                 >
                   <code style={{ fontFamily: 'var(--font-mono)' }}>{engine}</code>
-                  <span style={{ color: 'var(--text-muted)' }}>{version}</span>
+                  <span style={{ color: 'var(--color-text-muted)' }}>{version}</span>
                 </span>
               ))}
             </dd>
@@ -389,7 +159,7 @@ function NodeDetailPanel({ node, t }: { node: NodeView; t: TFunc }) {
         {/* Advertised agent addr */}
         {node.profile.advertisedAgentAddr && (
           <>
-            <dt style={{ fontSize: '0.75em', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-muted)', alignSelf: 'center', fontWeight: 600 }}>
+            <dt style={{ fontSize: '0.75em', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-text-muted)', alignSelf: 'center', fontWeight: 600 }}>
               Agent addr
             </dt>
             <dd style={{ margin: 0 }}>
@@ -403,7 +173,7 @@ function NodeDetailPanel({ node, t }: { node: NodeView; t: TFunc }) {
         {/* Advertised inference addr */}
         {node.profile.advertisedInferenceAddr && (
           <>
-            <dt style={{ fontSize: '0.75em', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-muted)', alignSelf: 'center', fontWeight: 600 }}>
+            <dt style={{ fontSize: '0.75em', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-text-muted)', alignSelf: 'center', fontWeight: 600 }}>
               Inference addr
             </dt>
             <dd style={{ margin: 0 }}>
@@ -420,7 +190,7 @@ function NodeDetailPanel({ node, t }: { node: NodeView; t: TFunc }) {
 
 // ---------------------------------------------------------------------------
 // Overflow action menu — ⋮ button that expands Drain / Restart / Remove.
-// Danger actions (Drain, Remove) use var(--danger-fg). A visual separator sits
+// Danger actions (Drain, Remove) use var(--color-danger). A visual separator sits
 // between the neutral Restart and the destructive Remove to create a natural
 // pause before the irreversible actions.
 // ---------------------------------------------------------------------------
@@ -451,13 +221,13 @@ function NodeActionMenu({
     border: 'none',
     cursor: 'pointer',
     fontSize: '0.875em',
-    color: 'var(--text)',
+    color: 'var(--color-text)',
     fontFamily: 'inherit',
   };
 
   const dangerItemStyle: React.CSSProperties = {
     ...menuItemStyle,
-    color: 'var(--danger-fg)',
+    color: 'var(--color-danger)',
   };
 
   return (
@@ -490,10 +260,10 @@ function NodeActionMenu({
               top: '100%',
               marginTop: '4px',
               zIndex: 11,
-              background: 'var(--surface)',
-              border: '1px solid var(--border)',
-              borderRadius: 'var(--radius)',
-              boxShadow: 'var(--shadow)',
+              background: 'var(--color-surface)',
+              border: '1px solid var(--color-border)',
+              borderRadius: 'var(--radius-md)',
+              boxShadow: 'var(--shadow-card)',
               padding: '4px 0',
               minWidth: '148px',
               listStyle: 'none',
@@ -505,7 +275,7 @@ function NodeActionMenu({
                 role="menuitem"
                 style={dangerItemStyle}
                 onClick={() => { setOpen(false); onDrain(); }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--danger-bg)'; }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--color-danger-bg)'; }}
                 onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; }}
               >
                 {t('fleet.action.drain')}
@@ -516,20 +286,20 @@ function NodeActionMenu({
                 role="menuitem"
                 style={menuItemStyle}
                 onClick={() => { setOpen(false); onRestart(); }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--surface-2)'; }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--color-surface-2)'; }}
                 onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; }}
               >
                 {t('fleet.action.restart')}
               </button>
             </li>
             {/* Visual separator before the destructive Remove action */}
-            <li role="separator" style={{ height: '1px', background: 'var(--border)', margin: '4px 0' }} />
+            <li role="separator" style={{ height: '1px', background: 'var(--color-border)', margin: '4px 0' }} />
             <li>
               <button
                 role="menuitem"
                 style={dangerItemStyle}
                 onClick={() => { setOpen(false); onRemove(); }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--danger-bg)'; }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--color-danger-bg)'; }}
                 onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; }}
               >
                 {t('fleet.action.remove')}
@@ -564,9 +334,11 @@ function NodeRow({
   const [showDrainModal, setShowDrainModal] = useState(false);
   const [showRemoveModal, setShowRemoveModal] = useState(false);
 
+  const isRetired = node.profile.state === 'decommissioned';
+
   return (
     <>
-      <tr>
+      <tr style={isRetired ? { opacity: 0.55 } : undefined}>
         <th
           scope="row"
           className="node-cell"
@@ -581,7 +353,7 @@ function NodeRow({
               width: '1em',
               marginRight: '6px',
               fontSize: '0.7em',
-              color: 'var(--text-muted)',
+              color: 'var(--color-text-muted)',
               transition: 'transform 150ms ease',
               transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
             }}
@@ -602,6 +374,15 @@ function NodeRow({
         </th>
         <td>
           <StatusPill state={node.profile.state} />
+          {isRetired && (
+            <span
+              className="muted"
+              title={t('fleet.node.retired.hint')}
+              style={{ marginLeft: '0.4rem', fontSize: '0.75rem', cursor: 'help' }}
+            >
+              {t('fleet.node.retired')}
+            </span>
+          )}
         </td>
         <td className="hw-cell">{hardwareSummary(node)}</td>
         <td>
@@ -699,7 +480,6 @@ export function FleetPage() {
   const t = useT();
   const capacity = useCapacity();
   const nodes = useNodes();
-  const reconcilerStatus = useReconcilerStatus();
   // Live hardware metrics via GET /api/v1/metrics (SSE). null until the first
   // frame arrives; each frame carries per-node engine metrics from heartbeats.
   const { snapshot: live, streamError } = useMetricsStream();
@@ -730,26 +510,35 @@ export function FleetPage() {
         <Badge tone="warning">{t('fleet.metrics.stale')}</Badge>
       )}
 
-      {capacity.isLoading && <LoadingBlock />}
-      {capacity.isError && (
-        <ErrorState
-          message={errorMessage(capacity.error, t, 'error.capacity')}
-          onRetry={() => capacity.refetch()}
-        />
-      )}
-      {capacity.data && (
-        <CapacityCard cap={capacity.data} liveDecodeTokS={live?.aggregateDecodeTokS} t={t} />
-      )}
-
-      {/* P-12: Reconciler card is always rendered (never conditionally hidden).
-          - isLoading: render nothing until the first response (TODO: skeleton)
-          - isError / no data: "Status unknown" badge — endpoint absent or unreachable
-          - data: full status card */}
-      {!reconcilerStatus.isLoading && (
-        <ReconcilerStatusCard status={reconcilerStatus.data} />
-      )}
-
-      <SloStatusCard t={t} />
+      {/* Idle anchor: nodes are ready but nothing is running. Guide the operator. */}
+      {capacity.data &&
+        capacity.data.readyNodeCount > 0 &&
+        (live?.aggregateDecodeTokS ?? capacity.data.aggregateDecodeTokS) === 0 && (
+          <div
+            data-testid="fleet-idle-banner"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+              background: 'var(--color-info-bg)',
+              border: '1px solid color-mix(in srgb, var(--color-info) 25%, transparent)',
+              borderRadius: 'var(--radius-md)',
+              padding: '12px 16px',
+              fontSize: '0.9em',
+            }}
+          >
+            <span aria-hidden="true" style={{ color: 'var(--color-info)', fontSize: '1.1em' }}>ℹ</span>
+            <span style={{ color: 'var(--color-text)' }}>
+              {t('fleet.idle.banner')}{' '}
+              <Link
+                to="/catalog"
+                style={{ color: 'var(--color-info)', fontWeight: 600, textDecoration: 'none', borderBottom: '1px solid color-mix(in srgb, var(--color-info) 40%, transparent)' }}
+              >
+                {t('fleet.idle.link')}
+              </Link>
+            </span>
+          </div>
+        )}
 
       <Card title={t('fleet.title')}>
         {nodes.isLoading && <LoadingBlock />}
@@ -764,44 +553,68 @@ export function FleetPage() {
             icon={<IconServer />}
             message={t('fleet.empty')}
             action={
-              <Link to="/" className="btn btn--primary btn--sm link-btn">
+              <Link to="/onboarding" className="btn btn--primary btn--sm link-btn">
                 {t('nav.onboarding')}
               </Link>
             }
           />
         )}
-        {nodes.data && nodes.data.length > 0 && (
-          <div className="table-wrap">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th scope="col">{t('fleet.col.node')}</th>
-                  <th scope="col">{t('fleet.col.state')}</th>
-                  <th scope="col">{t('fleet.col.hardware')}</th>
-                  <th scope="col">{t('fleet.col.load')}</th>
-                  <th scope="col">{t('fleet.col.link')}</th>
-                  <th scope="col">{t('fleet.col.actions')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {nodes.data.map((n) => (
-                  <NodeRow
-                    key={n.profile.nodeId}
-                    node={n}
-                    liveMetrics={liveByNode[n.profile.nodeId] ?? null}
-                    isExpanded={expandedNodeId === n.profile.nodeId}
-                    onToggle={() =>
-                      setExpandedNodeId(
-                        expandedNodeId === n.profile.nodeId ? null : n.profile.nodeId,
-                      )
-                    }
-                    t={t}
-                  />
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        {nodes.data && nodes.data.length > 0 && (() => {
+          // Sort: ready/running/degraded first; decommissioned/unreachable last.
+          // Operate on a copy — never mutate the query-cache reference.
+          const NODE_ORDER: Record<string, number> = {
+            ready: 0,
+            running: 0,
+            degraded: 1,
+            unreachable: 2,
+            decommissioned: 3,
+          };
+          const sorted = [...nodes.data].sort(
+            (a, b) =>
+              (NODE_ORDER[a.profile.state] ?? 1) - (NODE_ORDER[b.profile.state] ?? 1),
+          );
+          const readyCount = nodes.data.filter((n) => n.profile.state === 'ready').length;
+          return (
+            <>
+              <p
+                className="table-caption muted"
+                style={{ fontSize: '0.8rem', marginBottom: '0.5rem' }}
+              >
+                {t('fleet.nodes.readyOf', { ready: readyCount, total: nodes.data.length })}
+              </p>
+              <div className="table-wrap">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th scope="col">{t('fleet.col.node')}</th>
+                      <th scope="col">{t('fleet.col.state')}</th>
+                      <th scope="col">{t('fleet.col.hardware')}</th>
+                      <th scope="col">{t('fleet.col.load')}</th>
+                      <th scope="col">{t('fleet.col.link')}</th>
+                      <th scope="col">{t('fleet.col.actions')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sorted.map((n) => (
+                      <NodeRow
+                        key={n.profile.nodeId}
+                        node={n}
+                        liveMetrics={liveByNode[n.profile.nodeId] ?? null}
+                        isExpanded={expandedNodeId === n.profile.nodeId}
+                        onToggle={() =>
+                          setExpandedNodeId(
+                            expandedNodeId === n.profile.nodeId ? null : n.profile.nodeId,
+                          )
+                        }
+                        t={t}
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          );
+        })()}
       </Card>
     </div>
   );

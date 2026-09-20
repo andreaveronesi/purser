@@ -69,6 +69,64 @@ var routePermission = map[routeKey]string{
 	{http.MethodPost, "/api/v1/platform/orgs"}:        registry.PermPlatformOrgsCreate,
 	{http.MethodDelete, "/api/v1/platform/orgs/{id}"}: registry.PermPlatformOrgsDelete,
 	{http.MethodPost, "/api/v1/platform/pools"}:       registry.PermPlatformPoolsManage,
+
+	// ── Org / Team CRUD ───────────────────────────────────────────────────────
+	// Wave 3: replace inline isOrgAdminOrPlatformAdmin checks with granular perms.
+	// org:teams:create is the org-admin-level proxy for both create-team and
+	// update-org / update-team (no dedicated org:update perm in the catalog).
+	{http.MethodPost, "/api/v1/platform/orgs/{orgId}/teams"}: registry.PermOrgTeamsCreate,
+	{http.MethodPut, "/api/v1/platform/orgs/{id}"}:           registry.PermOrgTeamsCreate,
+	{http.MethodDelete, "/api/v1/platform/teams/{id}"}:       registry.PermOrgTeamsDelete,
+	{http.MethodPut, "/api/v1/platform/teams/{id}"}:          registry.PermOrgTeamsCreate,
+
+	// ── Org membership ───────────────────────────────────────────────────────
+	{http.MethodPost, "/api/v1/platform/orgs/{orgId}/members"}:            registry.PermOrgMembersInvite,
+	{http.MethodPut, "/api/v1/platform/orgs/{orgId}/members/{userId}"}:    registry.PermOrgMembersInvite,
+	{http.MethodDelete, "/api/v1/platform/orgs/{orgId}/members/{userId}"}: registry.PermOrgMembersRemove,
+
+	// ── Team membership ──────────────────────────────────────────────────────
+	{http.MethodPost, "/api/v1/platform/teams/{teamId}/members"}:            registry.PermTeamMembersInvite,
+	{http.MethodPut, "/api/v1/platform/teams/{teamId}/members/{userId}"}:    registry.PermTeamMembersInvite,
+	{http.MethodDelete, "/api/v1/platform/teams/{teamId}/members/{userId}"}: registry.PermTeamMembersRemove,
+
+	// ── Custom Roles CRUD ────────────────────────────────────────────────────
+	// Wave 3: replace inline isAdminActor checks in handleCreate/Update/DeleteRole.
+	{http.MethodPost, "/api/v1/platform/orgs/{orgId}/roles"}:        registry.PermOrgRolesCreate,
+	{http.MethodPut, "/api/v1/platform/orgs/{orgId}/roles/{id}"}:    registry.PermOrgRolesCreate,
+	{http.MethodDelete, "/api/v1/platform/orgs/{orgId}/roles/{id}"}: registry.PermOrgRolesDelete,
+	// GET roles: list/get is a read operation, available to any team member
+	// (same read bar as metrics/audit). Inference-only keys remain blocked.
+	{http.MethodGet, "/api/v1/platform/orgs/{orgId}/roles"}:      registry.PermTeamMetricsView,
+	{http.MethodGet, "/api/v1/platform/orgs/{orgId}/roles/{id}"}: registry.PermTeamMetricsView,
+
+	// ── Platform users ───────────────────────────────────────────────────────
+	// GET /platform/users lists all platform users; platform:users:invite is the
+	// closest platform-scope read permission in the current catalog.
+	// GAP: platform:users:view is absent — see hardening report.
+	{http.MethodGet, "/api/v1/platform/users"}: registry.PermPlatformUsersInvite,
+
+	// ── Billing ──────────────────────────────────────────────────────────────
+	// Global billing endpoints: team:metrics:view (consistent with billing.go
+	// comment "Auth: any RBAC role that can read /api/v1/*").
+	{http.MethodGet, "/api/v1/billing/report"}:          registry.PermTeamMetricsView,
+	{http.MethodGet, "/api/v1/billing/summary"}:         registry.PermTeamMetricsView,
+	{http.MethodGet, "/api/v1/billing/forecast"}:        registry.PermTeamMetricsView,
+	{http.MethodGet, "/api/v1/billing/models/adoption"}: registry.PermTeamMetricsView,
+	// Org-level billing is more sensitive (all-teams view); org:members:invite
+	// is the org-admin proxy. GAP: org:billing:view is absent — see report.
+	{http.MethodGet, "/api/v1/platform/orgs/{orgId}/billing"}: registry.PermOrgMembersInvite,
+	// Team-level billing: same read bar as other team metrics.
+	{http.MethodGet, "/api/v1/platform/teams/{teamId}/billing"}: registry.PermTeamMetricsView,
+
+	// ── GDPR operations ──────────────────────────────────────────────────────
+	// platform:orgs:delete is the highest-privilege proxy available in the
+	// current 22-permission catalog.
+	// GAP: platform:gdpr:manage is absent — see hardening report.
+	{http.MethodPost, "/api/v1/gdpr/erasure"}:    registry.PermPlatformOrgsDelete,
+	{http.MethodGet, "/api/v1/gdpr/erasure-log"}: registry.PermPlatformOrgsDelete,
+
+	// ── SLO ──────────────────────────────────────────────────────────────────
+	{http.MethodGet, "/api/v1/slo/compliance"}: registry.PermTeamMetricsView,
 }
 
 // matchRoutePermission returns the required permission string for the given

@@ -9,7 +9,9 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useI18n, useT, LOCALES, type Locale } from '../i18n';
 import { useTheme } from '../lib/theme';
+import { useAuth } from '../lib/auth';
 import {
+  IconBox,
   IconBuildingOffice,
   IconCalculator,
   IconChart,
@@ -28,6 +30,7 @@ import {
   IconShield,
   IconSun,
   IconTarget,
+  IconUsers,
 } from './icons';
 import type { StringKey } from '../i18n/en';
 import type { ReactNode } from 'react';
@@ -43,6 +46,7 @@ interface NavItem {
 // Day-to-day inference operations: what models are running, what's deployed,
 // how to test them. ML engineers live here.
 const INFERENCE: NavItem[] = [
+  { to: '/',            labelKey: 'nav.dashboard',   icon: <IconChart />, end: true },
   { to: '/fleet',       labelKey: 'nav.fleet',       icon: <IconServer /> },
   { to: '/catalog',     labelKey: 'nav.catalog',     icon: <IconGrid /> },
   { to: '/deployments', labelKey: 'nav.deployments', icon: <IconLayers /> },
@@ -63,6 +67,8 @@ const PLATFORM: NavItem[] = [
 // Security and platform teams live here.
 const GOVERNANCE: NavItem[] = [
   { to: '/platform/orgs',             labelKey: 'nav.organizations',  icon: <IconBuildingOffice /> },
+  { to: '/platform/users',            labelKey: 'nav.platformUsers',  icon: <IconUsers /> },
+  { to: '/platform/roles',            labelKey: 'nav.roles',          icon: <IconUsers /> },
   { to: '/api-keys',                  labelKey: 'nav.apiKeys',        icon: <IconKey /> },
   { to: '/platform/service-accounts', labelKey: 'nav.serviceAccounts', icon: <IconRobot /> },
   { to: '/platform/policies',         labelKey: 'nav.policies',       icon: <IconShield /> },
@@ -73,15 +79,19 @@ const GOVERNANCE: NavItem[] = [
 // Audit, cost, and reliability: what happened, how much it cost, and whether
 // SLOs are being met. Compliance and FinOps teams live here.
 const OBSERVABILITY: NavItem[] = [
-  { to: '/audit',      labelKey: 'nav.audit',      icon: <IconLock /> },
-  { to: '/chargeback', labelKey: 'nav.chargeback', icon: <IconChart /> },
-  { to: '/slo',        labelKey: 'nav.slo',        icon: <IconTarget /> },
+  { to: '/audit',       labelKey: 'nav.audit',      icon: <IconLock /> },
+  { to: '/admin-audit', labelKey: 'nav.adminAudit', icon: <IconShield /> },
+  { to: '/compliance',  labelKey: 'nav.compliance', icon: <IconCheckCircle /> },
+  { to: '/chargeback',  labelKey: 'nav.chargeback', icon: <IconChart /> },
+  { to: '/slo',         labelKey: 'nav.slo',        icon: <IconTarget /> },
 ];
 
 // ── ADMINISTRATION ────────────────────────────────────────────────────────────
-// Cluster management: enrolling new nodes and global settings.
+// Cluster management: enrolling new nodes, onboarding, and global settings.
 const ADMINISTRATION: NavItem[] = [
-  { to: '/join-token', labelKey: 'nav.joinTokens', icon: <IconPlus /> },
+  { to: '/onboarding', labelKey: 'nav.onboarding', icon: <IconPlus /> },
+  { to: '/join-token', labelKey: 'nav.joinTokens', icon: <IconServer /> },
+  { to: '/config',     labelKey: 'nav.configCode', icon: <IconBox /> },
   { to: '/settings',   labelKey: 'nav.settings',   icon: <IconSettings /> },
 ];
 
@@ -168,8 +178,51 @@ function ThemeToggle() {
   );
 }
 
+/**
+ * Shows the current user identity in the topbar.
+ *
+ * Dev-mode: displays a neutral "Dev mode" badge — no real identity to show.
+ * Auth-configured: displays the user's email/actor + a logout button.
+ */
+function UserBar() {
+  const t = useT();
+  const { user, isDevMode } = useAuth();
+
+  if (isDevMode) {
+    return (
+      <span className="topbar__dev-badge" title={t('auth.devMode.body')}>
+        {t('auth.devMode.badge')}
+      </span>
+    );
+  }
+
+  if (!user) return null;
+
+  return (
+    <div className="topbar__user">
+      <span className="topbar__user-name">{user.email || user.actor}</span>
+      <button
+        className="btn btn--ghost btn--compact"
+        onClick={() => { window.location.href = '/auth/logout'; }}
+        type="button"
+      >
+        {t('nav.user.logout')}
+      </button>
+    </div>
+  );
+}
+
 export function Layout() {
   const t = useT();
+  const { user, isDevMode, isAuthenticated } = useAuth();
+
+  // Section visibility predicates — filter what the sidebar shows.
+  // In dev-mode ALL predicates are true (no auth configured → full access).
+  // The backend enforces authorisation independently; this is UX-only.
+  const showInference     = isDevMode || isAuthenticated;
+  const showPlatformObs   = isDevMode || Boolean(user?.isPlatformAdmin) || Boolean(user?.isOrgAdmin);
+  const showAdministration = isDevMode || Boolean(user?.isPlatformAdmin);
+
   return (
     <div className="app-shell">
       <a href="#main" className="skip-link">
@@ -187,18 +240,36 @@ export function Layout() {
           </div>
         </div>
         <nav className="nav" aria-label={t('app.name')}>
-          <NavSection titleKey="nav.section.inference"     items={INFERENCE} />
-          <NavSection titleKey="nav.section.platform"      items={PLATFORM} />
-          <NavSection titleKey="nav.section.governance"    items={GOVERNANCE} />
-          <NavSection titleKey="nav.section.observability" items={OBSERVABILITY} />
-          <NavSection titleKey="nav.section.administration" items={ADMINISTRATION} />
+          {showInference     && <NavSection titleKey="nav.section.inference"      items={INFERENCE} />}
+          {showPlatformObs   && <NavSection titleKey="nav.section.platform"       items={PLATFORM} />}
+          {showPlatformObs   && <NavSection titleKey="nav.section.governance"     items={GOVERNANCE} />}
+          {showPlatformObs   && <NavSection titleKey="nav.section.observability"  items={OBSERVABILITY} />}
+          {showAdministration && <NavSection titleKey="nav.section.administration" items={ADMINISTRATION} />}
         </nav>
       </aside>
 
       <div className="content">
+        {isDevMode && (
+          <div
+            data-testid="devmode-banner"
+            className="devmode-banner"
+            style={{
+              padding: '0.35rem 1.25rem',
+              background: 'var(--color-warning-surface, #fef9c3)',
+              color: 'var(--color-warning-text, #92400e)',
+              borderBottom: '1px solid var(--color-warning-border, #fde68a)',
+              fontSize: '0.8rem',
+              fontWeight: 500,
+              letterSpacing: '0.01em',
+            }}
+          >
+            {t('devmode.banner')}
+          </div>
+        )}
         <header className="topbar">
           <div className="topbar__spacer" />
           <div className="topbar__actions">
+            <UserBar />
             <LanguagePicker />
             <ThemeToggle />
           </div>

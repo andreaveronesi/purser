@@ -112,8 +112,11 @@ volumes:
 ### Adding a node to a running cluster
 
 Cluster membership changes (AddVoter / RemoveServer) use the underlying
-`hashicorp/raft` API directly. A helper CLI command and the REST API surface
-for cluster membership are planned for v0.4.
+`hashicorp/raft` API directly. The read-only `GET /api/v1/cluster/status` endpoint
+(see [Checking cluster status](#checking-cluster-status)) is available today for
+inspecting the current leader and peer set, but there is still **no** dedicated
+REST endpoint or CLI command for adding or removing members — membership changes
+must be driven through the `hashicorp/raft` API in code.
 
 ---
 
@@ -165,6 +168,26 @@ Key fields:
 | `leader` | Network address of the current leader (empty during elections) |
 | `state` | Raft FSM state: `Leader`, `Follower`, `Candidate`, or `Shutdown` |
 | `stats` | Raw stats map from `hashicorp/raft` (term, commit index, peer count, …) |
+
+### From the dashboard
+
+The operator dashboard surfaces this status as a read-only **Control plane HA**
+card on the **Fleet** page, beside the reconciler and SLO cards. It polls
+`GET /api/v1/cluster/status` and adapts to the topology:
+
+- **Standalone (single node)** — shows a neutral "Standalone (single node)"
+  badge and a note that no HA replication is configured. This is the normal
+  shape for a single-node deployment and is **not** rendered as an error.
+- **Raft** — shows this node's Raft `state` (Leader / Follower / Candidate),
+  the total member count and peer count (derived from `num_peers`), the current
+  leader address, and a collapsible **Raft stats** panel with the raw
+  `hashicorp/raft` stats map.
+- **Unavailable** — if the endpoint cannot be reached, the card shows a neutral
+  "Status unknown" badge rather than disappearing, so operators can tell the
+  panel apart from a missing feature.
+
+No API key is required for the card because the underlying endpoint is
+unauthenticated (see above).
 
 ---
 

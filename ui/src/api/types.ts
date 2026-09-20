@@ -227,10 +227,23 @@ export interface NodeView {
 export interface ClusterCapacity {
   nodeCount: number;
   readyNodeCount: number;
-  ramTotalGb: number;
-  ramAvailableGb: number;
-  vramTotalGb: number;
-  vramAvailableGb: number;
+  /**
+   * Total RAM in GB summed across READY/RUNNING nodes, or null when the
+   * backend did not report this field (e.g. nodes enrolled before v0.7
+   * that have no hardware profile). null → show "not measured"; 0 is a
+   * real value (CPU-only cluster with no RAM data yet).
+   */
+  ramTotalGb: number | null;
+  /** Available RAM in GB, or null when not reported. */
+  ramAvailableGb: number | null;
+  /**
+   * Total VRAM in GB. null means the field is absent from the response.
+   * 0 is the real measured value for CPU-only clusters — show "0 GB",
+   * not "not measured".
+   */
+  vramTotalGb: number | null;
+  /** Available VRAM in GB, or null when not reported. */
+  vramAvailableGb: number | null;
   gpuCount: number;
   /** union of backends present across the fleet */
   backends: Backend[];
@@ -283,7 +296,14 @@ export interface Deployment {
   plan: DeploymentPlan;
   state: DeploymentState;
   nodeStatus: NodeLoadStatus[];
+  /** ISO-8601 creation timestamp; empty string when the backend omits it. */
   createdAt: string;
+  /**
+   * Human-readable error from the deployment detail, if any.
+   * Populated when state is `stopped` or `failed` and the backend emits
+   * `detail.error` (e.g. "host node-xyz not ready"). Absent otherwise.
+   */
+  error?: string;
 }
 
 /** Options an operator can override before/at deploy time. */
@@ -501,6 +521,43 @@ export interface AuditLog {
   chain: AuditChainVerification;
 }
 
+// ---------------------------------------------------------------------------
+// Compliance — AI Act technical documentation, GDPR record of processing, and
+// GDPR Art.17 right-to-erasure. All enterprise-gated (402 license_required).
+// ---------------------------------------------------------------------------
+
+/** Body for POST /api/v1/gdpr/erasure. */
+export interface GdprErasureInput {
+  /** Subject class. The backend currently supports only "api_key". */
+  subjectType: string;
+  /** SHA-256 hex of the subject's API key. */
+  subjectIdentifier: string;
+  /** Free-text reason, recorded in the immutable erasure log for accountability. */
+  reason: string;
+}
+
+/** Response from POST /api/v1/gdpr/erasure. */
+export interface GdprErasureResult {
+  /** Number of inference-audit rows pseudonymised for the subject. */
+  erasedEvents: number;
+  erasureType: string;
+  /** ISO-8601 completion timestamp. */
+  completedAt: string;
+  /** Truncated subject prefix (never the full hash) — safe to display. */
+  subjectPrefix: string;
+}
+
+/** One row of GET /api/v1/gdpr/erasure-log (the backend stub currently returns []). */
+export interface GdprErasureLogEntry {
+  id: number;
+  subjectHash: string;
+  erasedAt: string;
+  erasedBy: string;
+  reason: string;
+  eventsErased: number;
+  erasureType: string;
+}
+
 // --- reconciler ---
 
 /** Per-event-type summary inside ReconcilerStatus.tracker. */
@@ -585,8 +642,8 @@ export interface ApprovalQuorumStatus {
   approvers?: Array<{
     /** SHA-256 hash of the reviewer's API key token. */
     actor: string;
-    /** When this reviewer approved. */
-    approved_at: string; // ISO8601
+    /** When this reviewer approved. camelizeKeys converts approved_at → approvedAt. */
+    approvedAt: string; // ISO8601
   }>;
 }
 
@@ -622,35 +679,101 @@ export interface DeploymentApprovalsResponse {
 // GET /api/v1/billing/summary is not gated and used by the Settings-page stats.
 // ---------------------------------------------------------------------------
 
-/** Aggregate inference activity for one tenant+model pair in a billing window. */
+/**
+ * Aggregate inference activity for one tenant+model pair in a billing window.
+ * camelizeKeys maps the wire's snake_case fields (tenant_id, model_id, …)
+ * onto these camelCase names.
+ */
 export interface BillingTenantUsage {
-  tenant_id: string;
-  model_id: string;
-  request_count: number;
-  prompt_tokens: number;
-  completion_tokens: number;
-  total_tokens: number;
-  avg_latency_ms: number;
-  period_start: string; // ISO-8601
-  period_end: string;   // ISO-8601
+  tenantId: string;
+  modelId: string;
+  requestCount: number;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  avgLatencyMs: number;
+  periodStart: string; // ISO-8601
+  periodEnd: string;   // ISO-8601
+}
+
+/**
+ * SLA compliance rate for one tenant over the billing window. Present in a
+ * BillingReport only when the caller passes a `sla_threshold_ms` query param;
+ * `slaComplianceRate` is the fraction (0.0–1.0) of the tenant's requests
+ * whose latency was below the requested threshold.
+ */
+export interface TenantSLAStat {
+  tenantId: string;
+  slaComplianceRate: number; // 0.0–1.0
+  slaThresholdMs: number;
 }
 
 /** Full chargeback report for a configurable time window. */
 export interface BillingReport {
-  period_start: string;  // ISO-8601
-  period_end: string;    // ISO-8601
+  periodStart: string;  // ISO-8601
+  periodEnd: string;    // ISO-8601
   tenants: BillingTenantUsage[];
-  total_requests: number;
-  total_tokens: number;
+  totalRequests: number;
+  totalTokens: number;
+  /** Present only when a sla_threshold_ms was requested. */
+  slaStats?: TenantSLAStat[];
+}
+
+/**
+ * Per-team billing rollup — GET /api/v1/platform/teams/{teamId}/billing.
+ * Enterprise-gated (billing feature). `byModel` breaks the totals down by model.
+ */
+export interface TeamBillingReport {
+  teamId: string;
+  teamName?: string;
+  orgId?: string;
+  periodStart: string;
+  periodEnd: string;
+  totalRequests: number;
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  totalCostUsd: number;
+  byModel?: BillingTenantUsage[];
+}
+
+/**
+ * Per-organization billing rollup — GET /api/v1/platform/orgs/{orgId}/billing.
+ * Enterprise-gated (billing feature). Sums every team discovered under the org.
+ */
+export interface OrgBillingReport {
+  orgId: string;
+  orgName?: string;
+  periodStart: string;
+  periodEnd: string;
+  totalCostUsd: number;
+  totalTokens: number;
+  teams: TeamBillingReport[];
 }
 
 /** Quick billing summary (non-gated) for the Settings QuickStatsBar. */
 export interface BillingSummary {
-  period_start: string;
-  period_end: string;
-  total_requests: number;
-  total_tokens: number;
-  active_tenants: number;
+  periodStart: string;
+  periodEnd: string;
+  totalRequests: number;
+  totalTokens: number;
+  activeTenants: number;
+}
+
+// ---------------------------------------------------------------------------
+// v0.7 Auth — current user from GET /api/v1/platform/users/me.
+// Wire sends snake_case; camelizeKeys normalizer converts before this shape.
+// ---------------------------------------------------------------------------
+
+/** Current authenticated user returned by GET /api/v1/platform/users/me. */
+export interface CurrentUser {
+  actor: string;
+  email: string;
+  role: string;
+  isPlatformAdmin: boolean;
+  isOrgAdmin: boolean;
+  orgs: Organization[];
+  teams: Team[];
 }
 
 // ---------------------------------------------------------------------------
@@ -662,27 +785,27 @@ export interface Organization {
   name: string;
   slug: string;
   description?: string;
-  created_at: string;
-  updated_at: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Team {
   id: string;
-  org_id: string;
+  orgId: string;
   name: string;
   slug: string;
   description?: string;
-  created_at: string;
-  updated_at: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface TeamMember {
   id: number;
-  team_id: string;
-  user_id: string;
-  role_id: string;
-  created_at: string;
-  user?: { email: string; display_name: string };
+  teamId: string;
+  userId: string;
+  roleId: string;
+  createdAt: string;
+  user?: { email: string; displayName: string };
   role?: { name: string; permissions: string[] };
 }
 
@@ -690,20 +813,30 @@ export interface NodePool {
   id: string;
   name: string;
   description?: string;
-  owner_type: 'platform' | 'org' | 'team';
-  owner_id: string;
+  ownerType: 'platform' | 'org' | 'team';
+  ownerId: string;
   policy: 'exclusive' | 'shared';
-  node_ids?: string[];
-  created_at: string;
-  updated_at: string;
+  nodeIds?: string[];
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface PoolTeamQuota {
-  pool_id: string;
-  team_id: string;
-  max_deployments: number;
-  max_gpu_nodes: number;
+  poolId: string;
+  teamId: string;
+  maxDeployments: number;
+  maxGpuNodes: number;
   priority: number;
+}
+
+/**
+ * Mutable fields accepted by PUT /api/v1/platform/pools/{id}. All optional;
+ * only provided keys are changed server-side (policy must stay shared|exclusive).
+ */
+export interface UpdateNodePoolInput {
+  name?: string;
+  description?: string;
+  policy?: NodePool['policy'];
 }
 
 /**
@@ -723,11 +856,58 @@ export interface PlatformUser {
 }
 
 export interface EffectivePermissions {
-  user_id: string;
-  team_id: string;
-  org_id: string;
+  userId: string;
+  teamId: string;
+  orgId: string;
   permissions: string[];
-  is_org_admin: boolean;
+  isOrgAdmin: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// RBAC custom roles — GET/POST /api/v1/platform/orgs/{orgId}/roles and
+// GET/PUT/DELETE .../roles/{id}. A role is a named bundle of permission
+// strings, scoped to one org. Built-in ("system") roles are read-only.
+// The Go type is registry.CustomRole; camelizeKeys maps its snake_case wire
+// fields (org_id, is_system, created_at, updated_at) onto these camelCase names.
+// ---------------------------------------------------------------------------
+
+export interface CustomRole {
+  id: string;
+  /** Owning org id; empty for platform built-in roles. */
+  orgId?: string;
+  name: string;
+  description?: string;
+  /** Fine-grained permission keys, e.g. ["team:models:deploy"]. */
+  permissions: string[];
+  /** Built-in platform roles cannot be edited or deleted. */
+  isSystem: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Response shape for GET /api/v1/platform/orgs/{orgId}/roles. */
+export interface RolesResponse {
+  roles: CustomRole[];
+}
+
+/** The scope buckets the permission catalog is grouped into for display. */
+export type PermissionScope = 'platform' | 'org' | 'team' | 'inference';
+
+/**
+ * One entry of the permission catalog — GET /api/v1/platform/permissions.
+ * Every key here is a string the enforcement layer actually checks, so a role
+ * built from these keys genuinely grants access.
+ */
+export interface PermissionDescriptor {
+  key: string;
+  description: string;
+  /** "platform" | "org" | "team" | "inference" */
+  scope: string;
+}
+
+/** Response shape for GET /api/v1/platform/permissions. */
+export interface PermissionsResponse {
+  permissions: PermissionDescriptor[];
 }
 
 // ---------------------------------------------------------------------------
@@ -818,19 +998,26 @@ export interface WhatIfRequest {
   include_existing_nodes: boolean;
 }
 
+// NOTE: WhatIfAssignment and WhatIfResult are RESPONSE shapes — after
+// camelizeKeys() all field names are camelCase. WhatIfRequest / WhatIfNode are
+// REQUEST shapes sent verbatim to the API and stay snake_case.
 export interface WhatIfAssignment {
-  node_id: string;
-  layer_start: number;
-  layer_end: number;
+  nodeId: string;
+  layerStart: number;
+  layerEnd: number;
 }
 
 export interface WhatIfResult {
   feasible: boolean;
   assignments?: WhatIfAssignment[];
-  estimated_decode_tok_s_min?: number;
-  estimated_decode_tok_s_max?: number;
-  current_plan?: { feasible: boolean };
-  improvement_delta?: number;
+  /** Camelized from estimated_decode_tok_s_min */
+  estimatedDecodeTokSMin?: number | null;
+  /** Camelized from estimated_decode_tok_s_max */
+  estimatedDecodeTokSMax?: number | null;
+  /** Camelized from current_plan */
+  currentPlan?: { feasible: boolean };
+  /** Camelized from improvement_delta */
+  improvementDelta?: number | null;
   reason?: string;
 }
 
@@ -839,25 +1026,7 @@ export interface WhatIfResult {
 // ---------------------------------------------------------------------------
 
 
-// SloModelCompliance is a legacy flat shape; SloModelEntry mirrors the actual
-// nested shape returned by slo.go (v0.6).
 // ---------------------------------------------------------------------------
-
-/** Legacy flat shape used by the FleetPage SloStatusCard. */
-export interface SloModelCompliance {
-  model_id: string;
-  ttft_target_ms: number;
-  ttft_actual_compliance_pct: number;
-  status: 'met' | 'breached' | 'insufficient_data';
-}
-
-
-/** Legacy wrapper. */
-export interface SloComplianceResponse {
-  models: SloModelCompliance[];
-  window_hours: number;
-}
-
 
 /** SLO contract parameters (per model or global default). */
 export interface SloContractConfig {
@@ -906,16 +1075,41 @@ export interface SloComplianceModel {
 // ---------------------------------------------------------------------------
 
 export interface BillingForecastEntry {
-  org_id: string;
-  team_id: string;
-  burn_rate_daily_usd: number;
-  projected_monthly_usd: number;
-  budget_monthly_usd: number;
-  days_until_exhaustion: number | null;
+  orgId: string;
+  teamId: string;
+  burnRateDailyUsd: number;
+  projectedMonthlyUsd: number;
+  budgetMonthlyUsd: number;
+  daysUntilExhaustion: number | null;
 }
 
 export interface BillingForecastResponse {
   entries: BillingForecastEntry[];
+}
+
+// ---------------------------------------------------------------------------
+// Model adoption time-series — GET /api/v1/billing/models/adoption
+// Enterprise-gated: requires the "billing" feature (402 without).
+// ---------------------------------------------------------------------------
+
+/** One time bucket (day or ISO week) in a model-adoption series. */
+export interface ModelAdoptionBucket {
+  date: string;        // YYYY-MM-DD (day) or ISO-week start
+  requests: number;
+  tokensOut: number;
+}
+
+/** Request/token time-series for a single model. */
+export interface ModelAdoptionSeries {
+  modelId: string;
+  buckets: ModelAdoptionBucket[];
+}
+
+/** Response of GET /api/v1/billing/models/adoption (top 10 models). */
+export interface ModelAdoptionResponse {
+  window: 'daily' | 'weekly';
+  days: number;
+  series: ModelAdoptionSeries[];
 }
 
 // (WhatIf types are already defined above in types.ts)
@@ -954,6 +1148,31 @@ export interface DataPlane {
 export interface DataPlaneWithToken {
   dataplane: DataPlane;
   joinToken: string;
+}
+
+/**
+ * A fleet node as returned by GET /api/v1/platform/dataplanes/{id}/nodes.
+ * A lean projection of the control-plane Node row (the operator only needs
+ * enough to identify the node and see its lifecycle state here).
+ */
+export interface DataPlaneNode {
+  id: string;
+  hostname: string;
+  state: string;
+  os?: string;
+  arch?: string;
+}
+
+/**
+ * Mutable fields accepted by PUT /api/v1/platform/dataplanes/{id}. All optional;
+ * only the provided keys are changed server-side.
+ */
+export interface UpdateDataPlaneInput {
+  name?: string;
+  description?: string;
+  tier?: string;
+  gatewayUrl?: string;
+  status?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -1010,4 +1229,54 @@ export interface Policy {
 
 export interface PoliciesResponse {
   policies: Policy[];
+}
+
+// ---------------------------------------------------------------------------
+// Config-as-code — GET /config/export, POST /config/diff, POST /config/apply.
+// The wire exchanges a raw purser.yaml document (export returns YAML text; diff
+// and apply take a raw YAML body). Diff/apply responses are JSON, camelized by
+// the HTTP client. Object arrays (models/deployments/quotas) are kept opaque
+// (`unknown[]`) — the viewer surfaces counts and identifiers, not full specs.
+// ---------------------------------------------------------------------------
+
+export interface ConfigDiff {
+  /** Model specs the apply would create. */
+  modelsToAdd: unknown[];
+  /** Model IDs the apply would remove. */
+  modelsToRemove: string[];
+  /** Deployment specs the apply would create. */
+  deploymentsToAdd: unknown[];
+  /** Deployment IDs the apply would remove. */
+  deploymentsToRemove: string[];
+  /** Quota specs the apply would upsert. */
+  quotasToUpsert: unknown[];
+}
+
+/** Counts returned by POST /config/apply (from the server's `applied` object). */
+export interface ConfigApplyResult {
+  modelsAdded: number;
+  deploymentsAdded: number;
+  quotasUpserted: number;
+  orgsAdded: number;
+  nodePoolsAdded: number;
+  slosUpserted: number;
+}
+
+// ---------------------------------------------------------------------------
+// HA / Raft cluster status — GET /api/v1/cluster/status (UNauthenticated).
+// Standalone (no Raft) responds { mode: "standalone", isLeader: true }. In Raft
+// mode the response also carries the leader address, the Raft state string, and
+// the opaque hashicorp/raft stats map (keys camelized by the HTTP client, e.g.
+// `num_peers` -> `numPeers`).
+// ---------------------------------------------------------------------------
+
+export interface ClusterStatus {
+  mode: 'standalone' | 'raft';
+  isLeader: boolean;
+  /** Leader raft address (raft mode only). */
+  leader?: string;
+  /** Raft state string, e.g. "Leader", "Follower", "Candidate" (raft mode only). */
+  state?: string;
+  /** Opaque hashicorp/raft stats map (raft mode only); keys are camelized. */
+  stats?: Record<string, string>;
 }

@@ -32,6 +32,7 @@ import {
   useRevokeApiKey,
 } from '../hooks/queries';
 import { useT, type TFunc } from '../i18n';
+import { useCanOrgAdmin } from '../lib/auth';
 import { formatTokenCount, relativeTime } from '../lib/format';
 import { errorMessage } from '../lib/errors';
 import type { ApiKey, ApiKeyRole, ApiKeyWithSecret } from '../api/types';
@@ -250,7 +251,7 @@ function KeyRow({ apiKey, t }: { apiKey: ApiKey; t: TFunc }) {
           {apiKey.monthlyQuota === null ? (
             <span className="muted">{t('settings.usage.unlimited')}</span>
           ) : (
-            <Meter used={apiKey.usedThisMonth} total={apiKey.monthlyQuota} label={apiKey.name} unit="req" />
+            <Meter used={apiKey.usedThisMonth} total={apiKey.monthlyQuota ?? 0} label={apiKey.name} unit="req" />
           )}
         </td>
         <td>
@@ -309,6 +310,7 @@ function KeyRow({ apiKey, t }: { apiKey: ApiKey; t: TFunc }) {
 
 export function ApiKeysPage() {
   const t = useT();
+  const canOrgAdmin = useCanOrgAdmin();
   const { data, isLoading, isError, error, refetch } = useApiKeys();
   const [showCreate, setShowCreate] = useState(false);
   const [created, setCreated] = useState<ApiKeyWithSecret | null>(null);
@@ -332,9 +334,11 @@ export function ApiKeysPage() {
             >
               {t('apikeys.csv')}
             </Button>
-            <Button variant="primary" size="sm" onClick={() => setShowCreate(true)}>
-              {t('settings.keys.new')}
-            </Button>
+            {canOrgAdmin && (
+              <Button variant="primary" size="sm" onClick={() => setShowCreate(true)}>
+                {t('settings.keys.new')}
+              </Button>
+            )}
           </div>
         }
       />

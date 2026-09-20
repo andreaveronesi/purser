@@ -99,6 +99,54 @@ func TestHandleJoinToken_NoFleet(t *testing.T) {
 	}
 }
 
+func TestHandleJoinToken_ControlPlaneURL(t *testing.T) {
+	reg := newReg(t)
+	mgr := newFleetManager(t, reg)
+	// PublicAddr is the authoritative source for control_plane_url.
+	srv := server.New(reg, server.Config{
+		Fleet:      mgr,
+		PublicAddr: "https://cp.example.com:8443",
+	})
+
+	rec := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/v1/join-token", nil))
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want 201; body=%s", rec.Code, rec.Body.String())
+	}
+	var resp map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode: %v; raw=%s", err, rec.Body.String())
+	}
+	got, _ := resp["control_plane_url"].(string)
+	if got != "https://cp.example.com:8443" {
+		t.Errorf("control_plane_url = %q, want https://cp.example.com:8443", got)
+	}
+}
+
+func TestHandleJoinToken_ControlPlaneURL_FallsBackToAddr(t *testing.T) {
+	reg := newReg(t)
+	mgr := newFleetManager(t, reg)
+	// When PublicAddr is unset, the server falls back to Addr.
+	srv := server.New(reg, server.Config{
+		Fleet: mgr,
+		Addr:  ":8080",
+	})
+
+	rec := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/v1/join-token", nil))
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want 201; body=%s", rec.Code, rec.Body.String())
+	}
+	var resp map[string]any
+	_ = json.Unmarshal(rec.Body.Bytes(), &resp)
+	got, _ := resp["control_plane_url"].(string)
+	if got != ":8080" {
+		t.Errorf("control_plane_url = %q, want :8080 (fallback to Addr)", got)
+	}
+}
+
 func TestHandleCreateModel(t *testing.T) {
 	reg := newReg(t)
 	srv := server.New(reg, server.Config{})
