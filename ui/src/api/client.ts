@@ -271,6 +271,11 @@ export interface PurserApi {
   /** POST /auth/ldap-login — authenticate with LDAP credentials. On success the
    *  server sets a session cookie and returns 200. */
   ldapLogin(username: string, password: string): Promise<void>;
+  /** POST /auth/local-login — authenticate with the control plane's built-in
+   *  local admin account. On success the server sets a session cookie and 302s
+   *  (2xx/3xx = success); on failure it returns JSON `{message}`. Enabled only
+   *  when `config.localAuth` is true. */
+  localLogin(username: string, password: string): Promise<void>;
   getMyTeamPermissions(teamId: string): Promise<EffectivePermissions>;
 
   // --- v0.4 RBAC: custom roles (org-scoped) + permission catalog ---

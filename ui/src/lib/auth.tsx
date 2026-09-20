@@ -55,9 +55,10 @@ interface AuthProviderProps {
 export function AuthProvider({ children }: AuthProviderProps) {
   const { data: user, isLoading, isError } = useMe();
 
-  // Auth is configured when OIDC is present. If neither OIDC is configured,
-  // the backend treats every request as authenticated (dev/demo mode).
-  const authConfigured = Boolean(config.oidc);
+  // Auth is configured when OIDC or the built-in local admin login is present.
+  // If neither is configured, the backend treats every request as authenticated
+  // (dev/demo mode).
+  const authConfigured = Boolean(config.oidc) || Boolean(config.localAuth);
   const isDevMode = !authConfigured;
 
   const value = useMemo<AuthContextValue>(() => {

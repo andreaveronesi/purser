@@ -821,6 +821,11 @@ export const mockBackend: PurserApi = {
     return delay(undefined, 200) as Promise<void>;
   },
 
+  // In the mock backend local-admin login always succeeds (no credential check).
+  localLogin(_username: string, _password: string): Promise<void> {
+    return delay(undefined, 200) as Promise<void>;
+  },
+
   getMe(): Promise<CurrentUser> {
     return delay({
       actor: 'mock-user',
