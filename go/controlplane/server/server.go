@@ -886,7 +886,7 @@ func (s *Server) oidcMiddleware(next http.Handler) http.Handler {
 		// already-revoked session so the browser can always clear its cookie.
 		// /auth/ldap-login is the LDAP form login — unauthenticated by definition.
 		switch r.URL.Path {
-		case "/auth/login", "/auth/callback", "/auth/logout", "/auth/backchannel-logout", "/auth/ldap-login":
+		case "/auth/login", "/auth/callback", "/auth/logout", "/auth/backchannel-logout", "/auth/ldap-login", "/auth/local-login":
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -1011,6 +1011,9 @@ var rbacPublicPaths = map[string]bool{
 	// /auth/ldap-login is the LDAP form login endpoint — it IS the
 	// authentication endpoint and must be reachable without a prior credential.
 	"/auth/ldap-login": true,
+	// /auth/local-login is the built-in local admin login endpoint — it IS the
+	// authentication endpoint and must be reachable without a prior credential.
+	"/auth/local-login": true,
 }
 
 // rbacMiddleware enforces role-based access control on every request based on
