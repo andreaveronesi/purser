@@ -18,6 +18,7 @@ var exemptRoutes = map[string]string{
 	"POST /auth/token":                                "OIDC token exchange",
 	"GET /auth/ldap-login":                            "LDAP login redirect",
 	"POST /auth/ldap-login":                           "LDAP login",
+	"POST /auth/local-login":                          "built-in local admin login, auth endpoint, no UI feature client",
 	"POST /api/v1/usage":                              "internal gateway→CP usage ingest",
 	"POST /api/v1/inference-events":                   "internal gateway→CP audit ingest",
 	"GET /api/v1/openapi.json":                        "the contract document itself",

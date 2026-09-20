@@ -377,6 +377,19 @@ type Config struct {
 	// when set LDAPConfig is ignored.
 	LDAPConnector LDAPAuthenticator
 
+	// LocalAuthUsername is the username of the built-in local admin account.
+	// Defaults to "admin" in New() when empty. Read from PURSER_ADMIN_USERNAME
+	// (or the localAuth.username field of purser.yaml) by main.go.
+	LocalAuthUsername string
+	// LocalAuthPassword is the master password for the built-in local admin
+	// account. It is read from the PURSER_ADMIN_PASSWORD environment variable
+	// ONLY — never from purser.yaml — so the master key is not committed to a
+	// GitOps repo. When non-empty it does two things: it enables
+	// POST /auth/local-login, and it CLOSES the fail-open "demo mode" so that
+	// anonymous /api/v1/* requests are rejected with 401 instead of passed
+	// through. Leave empty to disable local admin login (demo mode preserved).
+	LocalAuthPassword string
+
 	// Quorum, when set, enables multi-person approval requirements for deployment
 	// gates (AI Act Art.14 dual-control). Loaded from purser.yaml quorum block at
 	// startup. Nil means single-approver mode (backward compatible default).
@@ -419,6 +432,12 @@ type Server struct {
 	raftNode          RaftNode                 // nil = standalone mode
 
 	ldapConnector LDAPAuthenticator // nil if LDAP not configured
+
+	// localAuthUsername / localAuthPassword back the built-in local admin
+	// account (POST /auth/local-login). When localAuthPassword is non-empty the
+	// account is enabled AND demo fail-open is closed. See Config.LocalAuthPassword.
+	localAuthUsername string
+	localAuthPassword string
 
 	// quorum holds the cluster-wide approval quorum configuration (from
 	// purser.yaml). Nil when no quorum config is set (single-approver mode).
@@ -603,6 +622,18 @@ func New(reg registry.Registry, cfg Config) *Server {
 		s.ldapConnector = ldapauth.New(cfg.LDAPConfig)
 	}
 
+	// Built-in local admin account. The password is env-only (never persisted
+	// in purser.yaml). When set it enables POST /auth/local-login AND closes the
+	// demo fail-open so anonymous /api/v1/* requests are rejected.
+	s.localAuthPassword = cfg.LocalAuthPassword
+	s.localAuthUsername = cfg.LocalAuthUsername
+	if s.localAuthUsername == "" {
+		s.localAuthUsername = "admin"
+	}
+	if s.localAuthPassword != "" {
+		logger.Info("local admin authentication enabled (demo fail-open closed)", "username", s.localAuthUsername)
+	}
+
 	s.routes()
 
 	// Eagerly load stored policies (if any) into the OPA engine so the first
@@ -755,6 +786,11 @@ func (s *Server) validateInternalToken(provided string) bool {
 	return subtle.ConstantTimeCompare([]byte(provided), []byte(s.internalToken)) == 1
 }
 
+// localAuthEnabled reports whether the built-in local admin account is
+// configured. A non-empty master password both enables POST /auth/local-login
+// and closes the demo fail-open (anonymous /api/v1/* → 401).
+func (s *Server) localAuthEnabled() bool { return s.localAuthPassword != "" }
+
 // startKeyExpiryWatcher emits audit events for API keys that will expire within
 // the next 14 days. It ticks every 6 hours and runs until ctx is cancelled.
 // Each affected key produces one "apikey.expiry_warning" audit entry carrying
@@ -841,7 +877,12 @@ func (s *Server) cleanupLimiters() {
 func (s *Server) oidcMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// 1. OIDC disabled — pass through unconditionally.
-		if s.oidcVerifier == nil {
+		// When the local admin account is configured we must NOT short-circuit
+		// here: the session-cookie validation below (which is OIDC-agnostic — it
+		// uses s.sessionSecret + oidc_sessions) has to run so a local session
+		// cookie is honored, and section 6 returns 401 for an anonymous request
+		// (closing the demo fail-open).
+		if s.oidcVerifier == nil && !s.localAuthEnabled() {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -850,7 +891,7 @@ func (s *Server) oidcMiddleware(next http.Handler) http.Handler {
 		// already-revoked session so the browser can always clear its cookie.
 		// /auth/ldap-login is the LDAP form login — unauthenticated by definition.
 		switch r.URL.Path {
-		case "/auth/login", "/auth/callback", "/auth/logout", "/auth/backchannel-logout", "/auth/ldap-login":
+		case "/auth/login", "/auth/callback", "/auth/logout", "/auth/backchannel-logout", "/auth/ldap-login", "/auth/local-login":
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -861,8 +902,13 @@ func (s *Server) oidcMiddleware(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		// 4. Try Bearer token (ID token from the IdP, existing flow).
-		if rawToken, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer "); ok && strings.TrimSpace(rawToken) != "" {
+		// 4. Try Bearer token (ID token from the IdP, existing flow). Guard on
+		// s.oidcVerifier != nil: when only local admin auth is enabled there is no
+		// verifier to validate a Bearer token against, so skip this block and let
+		// the session-cookie path (section 5) or the 401 fallthrough (section 6)
+		// handle the request. Without this guard the block dereferences a nil
+		// s.oidcVerifier and panics.
+		if rawToken, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer "); ok && strings.TrimSpace(rawToken) != "" && s.oidcVerifier != nil {
 			// When the verifier also implements GroupClaimsVerifier use VerifyClaims
 			// (single round-trip) for the full claim set; fall back to VerifyToken for
 			// backward compatibility with stubs that only implement the basic interface.
@@ -975,6 +1021,9 @@ var rbacPublicPaths = map[string]bool{
 	// /auth/ldap-login is the LDAP form login endpoint — it IS the
 	// authentication endpoint and must be reachable without a prior credential.
 	"/auth/ldap-login": true,
+	// /auth/local-login is the built-in local admin login endpoint — it IS the
+	// authentication endpoint and must be reachable without a prior credential.
+	"/auth/local-login": true,
 }
 
 // rbacMiddleware enforces role-based access control on every request based on
@@ -1097,6 +1146,16 @@ func (s *Server) rbacMiddleware(next http.Handler) http.Handler {
 			// not blocked when API keys are configured.
 			if s.validateInternalToken(r.Header.Get("X-Purser-Internal-Token")) {
 				next.ServeHTTP(w, r)
+				return
+			}
+			// Local admin account configured → demo fail-open is closed. A request
+			// with no valid session cookie (oidcMiddleware would have injected a
+			// role and this handler would not be on the no-token path) is rejected.
+			if s.localAuthEnabled() {
+				s.writeJSON(w, http.StatusUnauthorized, map[string]any{
+					"error":   "unauthorized",
+					"message": "authentication required: sign in as the local admin",
+				})
 				return
 			}
 			if s.oidcVerifier != nil {

@@ -662,6 +662,20 @@ func run(logger *slog.Logger) error {
 		}
 	}
 
+	// Built-in local admin account (optional — enabled when PURSER_ADMIN_PASSWORD
+	// is set). The master password is env-only and never read from purser.yaml.
+	// The username comes from PURSER_ADMIN_USERNAME, else the localAuth.username
+	// field of purser.yaml (when a config path is set), else defaults to "admin"
+	// in server.New. When the password is set, server.New closes the demo
+	// fail-open (anonymous /api/v1/* → 401).
+	localAdminPassword := os.Getenv("PURSER_ADMIN_PASSWORD")
+	localAdminUsername := os.Getenv("PURSER_ADMIN_USERNAME")
+	if localAdminUsername == "" && cfg.configPath != "" {
+		if cc, err := configpkg.LoadFile(cfg.configPath); err == nil && cc.LocalAuth != nil {
+			localAdminUsername = cc.LocalAuth.Username
+		}
+	}
+
 	// TLS setup for the management REST API.
 	// Priority: explicit cert/key files > auto mode via internal PKI > plain HTTP.
 	var tlsCertPEM, tlsKeyPEM []byte
@@ -697,29 +711,31 @@ func run(logger *slog.Logger) error {
 	// that handleClusterStatus can test s.raftNode == nil to detect standalone
 	// mode.
 	srvCfg := server.Config{
-		Addr:            cfg.addr,
-		PublicAddr:      envOr("PURSER_PUBLIC_ADDR", ""),
-		Logger:          logger,
-		Deployer:        orch,
-		Metrics:         regServer.Metrics(),
-		NodeMetrics:     regServer.Metrics(),
-		Planner:         planning.New(reg),
-		Fleet:           mgr,
-		ClusterID:       cfg.clusterID,
-		License:         lic,
-		OIDC:            oidcCfg,
-		OIDCVerifier:    oidcVerifier,
-		InternalToken:   cfg.internalToken,
-		HFToken:         cfg.hfToken,
-		TLSCert:         tlsCert,
-		TLSKey:          tlsKey,
-		TLSCertPEM:      tlsCertPEM,
-		TLSKeyPEM:       tlsKeyPEM,
-		RateLimitRPS:    cfg.rateLimitRPS,
-		RateLimitKeyRPS: cfg.rateLimitKeyRPS,
-		Reconciler:      rc,
-		SessionSecret:   sessionKey,
-		LDAPConfig:      ldapCfg,
+		Addr:              cfg.addr,
+		PublicAddr:        envOr("PURSER_PUBLIC_ADDR", ""),
+		Logger:            logger,
+		Deployer:          orch,
+		Metrics:           regServer.Metrics(),
+		NodeMetrics:       regServer.Metrics(),
+		Planner:           planning.New(reg),
+		Fleet:             mgr,
+		ClusterID:         cfg.clusterID,
+		License:           lic,
+		OIDC:              oidcCfg,
+		OIDCVerifier:      oidcVerifier,
+		InternalToken:     cfg.internalToken,
+		HFToken:           cfg.hfToken,
+		TLSCert:           tlsCert,
+		TLSKey:            tlsKey,
+		TLSCertPEM:        tlsCertPEM,
+		TLSKeyPEM:         tlsKeyPEM,
+		RateLimitRPS:      cfg.rateLimitRPS,
+		RateLimitKeyRPS:   cfg.rateLimitKeyRPS,
+		Reconciler:        rc,
+		SessionSecret:     sessionKey,
+		LDAPConfig:        ldapCfg,
+		LocalAuthUsername: localAdminUsername,
+		LocalAuthPassword: localAdminPassword,
 	}
 	if raftNode != nil {
 		srvCfg.RaftNode = raftNode

@@ -55,6 +55,7 @@ var apiRoutes = []routeDef{
 	{Method: "POST", Path: "/auth/token", Tag: "Authentication", Summary: "OAuth2 client_credentials token grant", OpID: "tokenEndpoint", Exempt: true, handler: func(s *Server) http.HandlerFunc { return s.handleTokenEndpoint }},
 	{Method: "GET", Path: "/auth/ldap-login", Tag: "Authentication", Summary: "Render the LDAP login form", OpID: "lDAPLoginForm", Exempt: true, handler: func(s *Server) http.HandlerFunc { return s.handleLDAPLoginForm }},
 	{Method: "POST", Path: "/auth/ldap-login", Tag: "Authentication", Summary: "Submit LDAP credentials", OpID: "lDAPLogin", Exempt: true, handler: func(s *Server) http.HandlerFunc { return s.handleLDAPLogin }},
+	{Method: "POST", Path: "/auth/local-login", Tag: "Authentication", Summary: "Submit local admin credentials", OpID: "localLogin", Exempt: true, handler: func(s *Server) http.HandlerFunc { return s.handleLocalLogin }},
 	{Method: "POST", Path: "/api/v1/ldap/test", Tag: "Authentication", Summary: "Test LDAP connectivity (admin)", OpID: "lDAPTest", Exempt: true, handler: func(s *Server) http.HandlerFunc { return s.handleLDAPTest }},
 	{Method: "POST", Path: "/api/v1/service-accounts", Tag: "Service Accounts", Summary: "Create a service account", OpID: "createServiceAccount", handler: func(s *Server) http.HandlerFunc { return s.handleCreateServiceAccount }},
 	{Method: "GET", Path: "/api/v1/service-accounts", Tag: "Service Accounts", Summary: "List service accounts", OpID: "listServiceAccounts", handler: func(s *Server) http.HandlerFunc { return s.handleListServiceAccounts }},
