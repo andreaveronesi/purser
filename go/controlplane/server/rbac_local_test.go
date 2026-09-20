@@ -76,6 +76,29 @@ func TestLocalAuth_CookieAllowed(t *testing.T) {
 	}
 }
 
+// TestLocalAuth_HealthStaysPublic verifies that the unauthenticated health
+// endpoints (used by Kubernetes liveness/readiness probes and load balancers)
+// remain reachable with a 200 even when local admin auth is enabled. These are
+// listed in rbacPublicPaths and must NOT be caught by the fail-open-closing
+// 401 path. Regression: enabling local auth made oidcMiddleware return 401 for
+// these probes, so the control-plane pod never became Ready.
+func TestLocalAuth_HealthStaysPublic(t *testing.T) {
+	srv := newLocalAuthSrv(t, nil)
+
+	for _, path := range []string{
+		"/api/v1/cluster/health",
+		"/api/v1/platform/health",
+	} {
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		rec := httptest.NewRecorder()
+		srv.Handler().ServeHTTP(rec, req)
+		if rec.Code == http.StatusUnauthorized {
+			t.Fatalf("anonymous GET %s with local auth enabled = 401, want public (200); body=%s",
+				path, rec.Body.String())
+		}
+	}
+}
+
 // TestLocalAuth_DisabledStillOpen verifies that when local auth is NOT
 // configured the demo fail-open is preserved: anonymous /api/v1/* passes.
 func TestLocalAuth_DisabledStillOpen(t *testing.T) {

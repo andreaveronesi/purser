@@ -895,6 +895,20 @@ func (s *Server) oidcMiddleware(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
+		// 2b. Local-auth-only mode (no OIDC verifier): public endpoints
+		// (health/status/openapi) must stay reachable unauthenticated —
+		// Kubernetes probes and load balancers hit these with no credential.
+		// We only reach this point without a verifier because local admin auth is
+		// enabled; without this exemption the section-6 fallthrough would return
+		// 401 for /api/v1/cluster/health and the control-plane pod would never
+		// become Ready. rbacMiddleware applies the same allowlist downstream, so
+		// real enforcement is unchanged. This is guarded on oidcVerifier == nil so
+		// it does NOT alter behaviour when OIDC is configured (where health stays
+		// protected, as the OIDC tests assert).
+		if s.oidcVerifier == nil && r.Method == http.MethodGet && rbacPublicPaths[r.URL.Path] {
+			next.ServeHTTP(w, r)
+			return
+		}
 		// 3. Gateway internal-token exemption: the gateway sends route-sync
 		// requests with X-Purser-Internal-Token; those must not require a
 		// human OIDC token. Use constant-time comparison to prevent timing attacks.

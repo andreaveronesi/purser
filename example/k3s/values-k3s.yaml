@@ -75,9 +75,15 @@ gateway:
   # Shared control-plane ↔ gateway route-sync token. Empty => the chart
   # generates a random one at install and reuses it on upgrade.
   internalToken: ""
-  # Empty => gateway open dev mode (accepts any non-empty bearer). Fine for a
-  # local playground; set real keys before exposing the gateway.
+  # Empty => no API keys configured. The gateway refuses to start with neither
+  # API keys nor dev mode, so we enable dev mode below for this local playground.
   apiKeys: ""
+  # PURSER_GATEWAY_DEV_MODE=1: accept any non-empty bearer token (local demo
+  # only). Set real PURSER_GATEWAY_API_KEYS (via gateway.apiKeys) before exposing
+  # the gateway to anything but your laptop.
+  extraEnv:
+    - name: PURSER_GATEWAY_DEV_MODE
+      value: "1"
 
 ui:
   # MUST be 8080 — the nginx image listens on 8080 and runs non-root (cannot bind

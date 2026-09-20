@@ -26,6 +26,27 @@ spec:
       securityContext:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- if ((.Values.containerSecurityContext).readOnlyRootFilesystem) }}
+      # With a read-only root filesystem the UI's runtime-config entrypoint
+      # (40-purser-runtime-config.sh) cannot rewrite env.js in the image's web
+      # root, so window.__PURSER_CONFIG__ would stay empty and every runtime
+      # setting (apiBase, gatewayBase, localAuth, oidc) would be silently
+      # ignored. This initContainer copies the baked static bundle into a
+      # writable emptyDir that is then mounted over the web root, so the
+      # entrypoint can regenerate env.js while the root FS stays read-only.
+      initContainers:
+        - name: copy-webroot
+          image: {{ include "purser.ui.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- with .Values.containerSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          command: ["/bin/sh", "-c", "cp -a /usr/share/nginx/html/. /webroot/"]
+          volumeMounts:
+            - name: webroot
+              mountPath: /webroot
+      {{- end }}
       containers:
         - name: ui
           image: {{ include "purser.ui.image" . | quote }}
@@ -51,6 +72,10 @@ spec:
           # can write its cache, pid-file, and temp directories.
           {{- if ((.Values.containerSecurityContext).readOnlyRootFilesystem) }}
           volumeMounts:
+            # Writable web root (populated by the copy-webroot initContainer) so
+            # the entrypoint can regenerate env.js under a read-only root FS.
+            - name: webroot
+              mountPath: /usr/share/nginx/html
             - name: nginx-cache
               mountPath: /var/cache/nginx
             - name: nginx-run
@@ -76,6 +101,8 @@ spec:
           {{- end }}
       {{- if ((.Values.containerSecurityContext).readOnlyRootFilesystem) }}
       volumes:
+        - name: webroot
+          emptyDir: {}
         - name: nginx-cache
           emptyDir: {}
         - name: nginx-run
