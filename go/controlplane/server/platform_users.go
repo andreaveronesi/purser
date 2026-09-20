@@ -502,7 +502,14 @@ func (s *Server) isAdminActor(r *http.Request) bool {
 	}
 	has, err := s.reg.HasAnyAPIKey(r.Context())
 	if err != nil || !has {
-		// No keys in system → dev mode, allow everything.
+		// No keys in system. In pure dev mode (nothing configured) allow
+		// everything. But when the local admin account is configured the demo
+		// fail-open is closed: an unauthenticated caller is NOT an admin — only a
+		// valid local session cookie (which injects ctxKeyOIDCRole="admin" above)
+		// grants admin.
+		if s.localAuthEnabled() {
+			return false
+		}
 		return true
 	}
 	return false

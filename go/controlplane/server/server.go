@@ -877,7 +877,12 @@ func (s *Server) cleanupLimiters() {
 func (s *Server) oidcMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// 1. OIDC disabled — pass through unconditionally.
-		if s.oidcVerifier == nil {
+		// When the local admin account is configured we must NOT short-circuit
+		// here: the session-cookie validation below (which is OIDC-agnostic — it
+		// uses s.sessionSecret + oidc_sessions) has to run so a local session
+		// cookie is honored, and section 6 returns 401 for an anonymous request
+		// (closing the demo fail-open).
+		if s.oidcVerifier == nil && !s.localAuthEnabled() {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -897,8 +902,13 @@ func (s *Server) oidcMiddleware(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		// 4. Try Bearer token (ID token from the IdP, existing flow).
-		if rawToken, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer "); ok && strings.TrimSpace(rawToken) != "" {
+		// 4. Try Bearer token (ID token from the IdP, existing flow). Guard on
+		// s.oidcVerifier != nil: when only local admin auth is enabled there is no
+		// verifier to validate a Bearer token against, so skip this block and let
+		// the session-cookie path (section 5) or the 401 fallthrough (section 6)
+		// handle the request. Without this guard the block dereferences a nil
+		// s.oidcVerifier and panics.
+		if rawToken, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer "); ok && strings.TrimSpace(rawToken) != "" && s.oidcVerifier != nil {
 			// When the verifier also implements GroupClaimsVerifier use VerifyClaims
 			// (single round-trip) for the full claim set; fall back to VerifyToken for
 			// backward compatibility with stubs that only implement the basic interface.
@@ -1136,6 +1146,16 @@ func (s *Server) rbacMiddleware(next http.Handler) http.Handler {
 			// not blocked when API keys are configured.
 			if s.validateInternalToken(r.Header.Get("X-Purser-Internal-Token")) {
 				next.ServeHTTP(w, r)
+				return
+			}
+			// Local admin account configured → demo fail-open is closed. A request
+			// with no valid session cookie (oidcMiddleware would have injected a
+			// role and this handler would not be on the no-token path) is rejected.
+			if s.localAuthEnabled() {
+				s.writeJSON(w, http.StatusUnauthorized, map[string]any{
+					"error":   "unauthorized",
+					"message": "authentication required: sign in as the local admin",
+				})
 				return
 			}
 			if s.oidcVerifier != nil {
