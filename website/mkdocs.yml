@@ -98,6 +98,10 @@ nav:
     - Node Pools: configuration/node-pools.md
     - Platform UI (Orgs, Teams & Pools): configuration/platform-ui.md
     - Multi-Replica Deployments: configuration/multi-replica.md
+  - Authentication:
+    - Getting Started: auth/getting-started.md
+    - Local Admin Login (Master Key): auth/local-admin.md
+    - UI Navigation & Action Gating (RBAC): auth/rbac-ui.md
   - Enterprise:
     - Open-Core Model: enterprise/overview.md
     - Licensing & Key Management: enterprise/licensing.md

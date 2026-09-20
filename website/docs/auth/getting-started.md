@@ -50,6 +50,14 @@ enters **development mode**:
 Development mode is the default when running `docker compose up -d` (the demo stack)
 without setting any `PURSER_OIDC_*` variables.
 
+## Local admin login (no IdP)
+
+If you want real authentication but do not want to run OIDC or LDAP, set a **master key**
+(`PURSER_ADMIN_PASSWORD`) on the control plane. This enables a single built-in admin
+account that logs in via `POST /auth/local-login`, and it switches off development /
+fail-open mode so anonymous API requests are rejected. See
+[Local admin login (master key)](local-admin.md) for the full setup.
+
 ## What /me returns
 
 After a successful login, `GET /api/v1/platform/users/me` returns the current user:
