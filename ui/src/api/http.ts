@@ -1199,6 +1199,30 @@ export function createHttpApi(baseUrl: string): PurserApi {
         }
       }),
 
+    // Note: /auth/local-login is served by the auth router (not /api/v1), so we
+    // call fetch directly with an absolute path to avoid the /api/v1 base prefix.
+    // On success the server sets a session cookie and 302s to /. A same-origin
+    // fetch surfaces that redirect as an opaque response (type 'opaqueredirect')
+    // rather than following it, so we treat both a 2xx/3xx `ok` response and an
+    // opaque redirect as success.
+    localLogin: (username: string, password: string) =>
+      fetch('/auth/local-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ username, password }),
+      }).then(async (res) => {
+        if (res.type === 'opaqueredirect') return;
+        if (!res.ok) {
+          const body: unknown = await res.json().catch(() => ({}));
+          const msg =
+            body && typeof body === 'object'
+              ? ((body as Record<string, unknown>).message ?? 'Local login failed')
+              : 'Local login failed';
+          throw new ApiError(res.status, String(msg));
+        }
+      }),
+
     getMyTeamPermissions: (teamId) =>
       request<EffectivePermissions>(`/platform/teams/${enc(teamId)}/my-permissions`),
 

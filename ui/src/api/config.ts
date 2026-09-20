@@ -49,6 +49,10 @@ interface PurserRuntimeConfig {
   /** OIDC configuration for the admin UI login flow. Present only when all
    *  three PURSER_OIDC_* env vars are set in the container. */
   oidc?: OIDCRuntimeConfig;
+  /** true -> the control plane has a built-in local admin login enabled, so the
+   *  UI surfaces a username/password form posting to /auth/local-login. Set by
+   *  the container entrypoint when PURSER_LOCAL_ADMIN is enabled. */
+  localAuth?: boolean;
 }
 
 declare global {
@@ -113,6 +117,10 @@ export const config = {
   oidc: (rt.oidc?.issuer && rt.oidc?.clientId && rt.oidc?.redirectUri)
     ? { issuer: rt.oidc.issuer, clientId: rt.oidc.clientId, redirectUri: rt.oidc.redirectUri }
     : null,
+  /** true -> the control plane has a built-in local admin login enabled; the
+   *  UI shows a username/password form posting to /auth/local-login. Only the
+   *  literal boolean `true` enables it — every other value is off. */
+  localAuth: rt.localAuth === true,
 } as const;
 
 /**

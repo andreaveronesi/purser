@@ -60,6 +60,41 @@ describe('resolveMock — mock flag', () => {
 });
 
 // ---------------------------------------------------------------------------
+// config.localAuth — reflects window.__PURSER_CONFIG__.localAuth === true
+// ---------------------------------------------------------------------------
+
+describe('config.localAuth — built-in local admin login flag', () => {
+  it('localAuth is false when the runtime flag is absent', async () => {
+    vi.stubGlobal('window', { __PURSER_CONFIG__: {} });
+    // @ts-expect-error — Vite cache-busting query param
+    const { config } = await import('../config?t=localauth-absent') as typeof ConfigModule;
+    expect(config.localAuth).toBe(false);
+  });
+
+  it('localAuth is true when the runtime flag is exactly true', async () => {
+    vi.stubGlobal('window', { __PURSER_CONFIG__: { localAuth: true } });
+    // @ts-expect-error — Vite cache-busting query param
+    const { config } = await import('../config?t=localauth-true') as typeof ConfigModule;
+    expect(config.localAuth).toBe(true);
+  });
+
+  it('localAuth is false when the runtime flag is explicitly false', async () => {
+    vi.stubGlobal('window', { __PURSER_CONFIG__: { localAuth: false } });
+    // @ts-expect-error — Vite cache-busting query param
+    const { config } = await import('../config?t=localauth-false') as typeof ConfigModule;
+    expect(config.localAuth).toBe(false);
+  });
+
+  it('localAuth is false for a non-boolean truthy value (strict === true)', async () => {
+    // Only the literal boolean true enables local auth — a stray string must not.
+    vi.stubGlobal('window', { __PURSER_CONFIG__: { localAuth: 'true' as unknown as boolean } });
+    // @ts-expect-error — Vite cache-busting query param
+    const { config } = await import('../config?t=localauth-string') as typeof ConfigModule;
+    expect(config.localAuth).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // handleUnauthorized — redirect only when OIDC is configured
 // ---------------------------------------------------------------------------
 
