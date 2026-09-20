@@ -29,11 +29,13 @@ vi.mock('../i18n', () => ({
 // Mock config
 // ---------------------------------------------------------------------------
 let mockOidc: { issuer: string; clientId: string; redirectUri: string } | null = null;
+let mockLocalAuth = false;
 
 vi.mock('../api/config', () => ({
   config: new Proxy({} as Record<string, unknown>, {
     get: (_t, prop) => {
       if (prop === 'oidc') return mockOidc;
+      if (prop === 'localAuth') return mockLocalAuth;
       return undefined;
     },
   }),
@@ -41,12 +43,14 @@ vi.mock('../api/config', () => ({
 }));
 
 // ---------------------------------------------------------------------------
-// Mock api client for LDAP login
+// Mock api client for LDAP + local-admin login
 // ---------------------------------------------------------------------------
 const mockLdapLogin = vi.fn();
+const mockLocalLogin = vi.fn();
 vi.mock('../api/client', () => ({
   api: {
     ldapLogin: (...args: unknown[]) => mockLdapLogin(...args),
+    localLogin: (...args: unknown[]) => mockLocalLogin(...args),
   },
   makeChat: vi.fn(),
 }));
@@ -67,7 +71,9 @@ function renderLogin() {
 
 beforeEach(() => {
   mockOidc = null;
+  mockLocalAuth = false;
   mockLdapLogin.mockReset();
+  mockLocalLogin.mockReset();
   // Reset window.location manipulation
   delete (window as unknown as Record<string, unknown>).location;
   (window as unknown as Record<string, unknown>).location = { href: '' };
@@ -190,6 +196,65 @@ describe('LoginPage — LDAP form', () => {
 
     await waitFor(() => {
       expect(screen.getByText('auth.login.ldap.error')).toBeInTheDocument();
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Local-admin login (config.localAuth === true, no OIDC)
+// ---------------------------------------------------------------------------
+describe('LoginPage — local-admin login', () => {
+  beforeEach(() => {
+    mockLocalAuth = true;
+    mockOidc = null;
+  });
+
+  it('renders the local login form, not the dev-mode banner', () => {
+    renderLogin();
+    expect(screen.queryByText('auth.devMode.title')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('auth.login.local.username')).toBeInTheDocument();
+    expect(screen.getByLabelText('auth.login.local.password')).toBeInTheDocument();
+  });
+
+  it('does NOT show the OIDC button when only local auth is configured', () => {
+    renderLogin();
+    expect(screen.queryByText('auth.login.oidc.button')).not.toBeInTheDocument();
+  });
+
+  it('submits local-admin credentials and redirects to / on success', async () => {
+    mockLocalLogin.mockResolvedValueOnce(undefined);
+    renderLogin();
+
+    fireEvent.change(screen.getByLabelText('auth.login.local.username'), {
+      target: { value: 'admin' },
+    });
+    fireEvent.change(screen.getByLabelText('auth.login.local.password'), {
+      target: { value: 'pw' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'auth.login.local.submit' }));
+
+    await waitFor(() => {
+      expect(mockLocalLogin).toHaveBeenCalledWith('admin', 'pw');
+    });
+    await waitFor(() => {
+      expect(window.location.href).toBe('/');
+    });
+  });
+
+  it('shows an inline error on local-admin login failure', async () => {
+    mockLocalLogin.mockRejectedValueOnce(new Error('bad creds'));
+    renderLogin();
+
+    fireEvent.change(screen.getByLabelText('auth.login.local.username'), {
+      target: { value: 'admin' },
+    });
+    fireEvent.change(screen.getByLabelText('auth.login.local.password'), {
+      target: { value: 'nope' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'auth.login.local.submit' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('auth.login.local.error')).toBeInTheDocument();
     });
   });
 });

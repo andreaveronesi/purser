@@ -22,11 +22,13 @@ import type { CurrentUser } from '../../api/types';
 // ---------------------------------------------------------------------------
 
 let mockOidc: { issuer: string; clientId: string; redirectUri: string } | null = null;
+let mockLocalAuth = false;
 
 vi.mock('../../api/config', () => ({
-  config: new Proxy({} as { oidc: typeof mockOidc; mock: boolean; apiBase: string; gatewayBase: string }, {
+  config: new Proxy({} as { oidc: typeof mockOidc; localAuth: boolean; mock: boolean; apiBase: string; gatewayBase: string }, {
     get: (_t, prop) => {
       if (prop === 'oidc') return mockOidc;
+      if (prop === 'localAuth') return mockLocalAuth;
       if (prop === 'mock') return false;
       if (prop === 'apiBase') return '/api/v1';
       if (prop === 'gatewayBase') return '/v1';
@@ -81,6 +83,7 @@ function Wrapper({ children }: { children: ReactNode }) {
 
 beforeEach(() => {
   mockOidc = null;
+  mockLocalAuth = false;
   mockMeResult = { data: undefined, isLoading: false, isError: false };
 });
 
@@ -119,6 +122,24 @@ describe('AuthProvider — dev-mode (no OIDC configured)', () => {
     const { result } = renderHook(() => useAuth(), { wrapper: Wrapper });
     // dev-mode skips the loading wait — always ready
     expect(result.current.isLoading).toBe(false);
+  });
+});
+
+describe('AuthProvider — auth configured (local admin present, no OIDC)', () => {
+  it('isDevMode = false when config.localAuth is true even without OIDC', () => {
+    mockOidc = null;
+    mockLocalAuth = true;
+    mockMeResult = { data: MOCK_USER, isLoading: false, isError: false };
+    const { result } = renderHook(() => useAuth(), { wrapper: Wrapper });
+    expect(result.current.isDevMode).toBe(false);
+  });
+
+  it('isAuthenticated = false when local auth is configured but /me has no user', () => {
+    mockOidc = null;
+    mockLocalAuth = true;
+    mockMeResult = { data: undefined, isLoading: false, isError: false };
+    const { result } = renderHook(() => useAuth(), { wrapper: Wrapper });
+    expect(result.current.isAuthenticated).toBe(false);
   });
 });
 
